@@ -45,11 +45,11 @@ Maintenance branch statuses include:
 
 | Date       | Event                     |
 | ---------- | ------------------------ |
-| 2025-05-26 | Released preview version `3.2.0rc2` |
-| 2025-11-12 | Released preview version `3.2.0rc3` |
-| 2025-11-14 | Released preview version `3.2.0rc4` |
-| 2026-01-21 | Released stable version `3.2.0`   |
 | 2026-05-06 | Released stable version `3.2.1`   |
+| 2026-01-21 | Released stable version `3.2.0`   |
+| 2025-11-14 | Released preview version `3.2.0rc4` |
+| 2025-11-12 | Released preview version `3.2.0rc3` |
+| 2025-05-26 | Released preview version `3.2.0rc2` |
 
 ## Version Compatibility Matrix
 
