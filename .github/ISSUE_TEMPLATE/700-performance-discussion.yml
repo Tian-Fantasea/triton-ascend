@@ -1,4 +1,4 @@
-name: Report a performance issue
+name: ⚡ Report a performance issue
 description: Report cases where triton is generating sub-optimal (but functionally correct) PTX/LLVM IR
 labels: ["performance"]
 

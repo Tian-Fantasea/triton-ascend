@@ -1,4 +1,4 @@
-name: Report a bug
+name: 🐛 Report a bug
 description: Report triton failing to compile a kernel, or giving incorrect results
 labels: ["bug"]
 
