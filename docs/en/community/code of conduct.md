@@ -59,12 +59,9 @@ representative at an online or offline/IRL event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement in the #code-of-conduct
-channel in the [vLLM Discord](https://discord.com/invite/jz7wjKhh6g).
+reported to the community leaders responsible for enforcement in Triton-Ascend.
 All complaints will be reviewed and investigated promptly and fairly.
-
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
 ## Enforcement Guidelines
 
