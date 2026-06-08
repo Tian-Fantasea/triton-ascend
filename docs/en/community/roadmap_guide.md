@@ -4,44 +4,62 @@ Use GitHub Issues to track and manage each organization's plans and mid-to-long-
 Below is a complete Roadmap Issue example demonstrating the practical application of all recommended elements. It is recommended to review this example first for an overall impression, then read the detailed specification instructions that follow.
 
 ```markdown
-Create Issue title: [Roadmap] Triton-Ascend Core Roadmap 2026 Q1
+Create Issue title: [Roadmap] Triton-Ascend Roadmap 2026 Q2
 
 ---
-# Triton-Ascend Core Roadmap 2026 Q1
+# Triton-Ascend Roadmap 2026 Q2
 
-This quarter focuses on long sequence parallel capability enhancement, FSDP training capability construction, and documentation system optimization, continuously improving training performance, ecosystem compatibility, and development usability.
+This quarter focuses on upstream Triton compatibility alignment, Ascend NPU backend performance optimization, and operator coverage expansion, continuously improving compiler stability and ecosystem integration capability.
 
 ## Focus
 
-- Long Sequence: Enhance KV Allgather CP parallel capability and CP code maintainability
-- FSDP Capability: Build FSDP2 training backend and Attn+MoE end-to-end training solution
-- Documentation: Systematically optimize documentation structure and contribution compliance docs
+- Upstream Compatibility: Align with upstream Triton compiler frontend and IR changes, reduce fork divergence
+- Backend Performance: Optimize Ascend NPU kernel generation and memory scheduling strategy
+- Operator Coverage: Expand supported Triton ops and data types, improve end-to-end model coverage
+- Usability: Improve debugging tools and error reporting for Ascend backend
 
-## Long Sequence Enhancement
+## Upstream Compatibility
 
-- [ ] **KV Allgather CP parallel scheme support**
-Goal: Support KV Allgather CP parallel scheme
+- [ ] **Triton 3.x IR and frontend alignment**
+Goal: Align forked Triton frontend with upstream Triton 3.x IR changes, reduce merge conflict and divergence
 Issue: [Related Issue link]
 
-- [ ] **CP code refactoring and interface alignment**
-Goal: Complete CP code refactoring, align interfaces with TE, improve ease of integration for ecosystem libraries like VeRL
+- [ ] **Triton Language feature parity check**
+Goal: Systematically check and supplement missing Triton language features (e.g., tl.dot with new dtypes, constexpr enhancements) on Ascend backend
 Issue: [Related Issue link]
 
-## FSDP Capability
+## Backend Performance
 
-- [ ] **FSDP2-based training backend setup**
-Goal: Set up a training backend based on the FSDP2 scheme, supporting direct HuggingFace model integration and decoupling from mcore
+- [ ] **Ascend NPU kernel auto-tuning support**
+Goal: Support Triton autotune mechanism on Ascend backend, enable dynamic kernel configuration selection
+Owner: @contributor-a
 Issue: [Related Issue link]
 
-- [ ] **Attn(FSDP) + MoE(EP+FSDP) training solution**
-Goal: Build end-to-end training capability based on Qwen and QwenVL series
+- [ ] **Memory scheduling and L2 cache optimization**
+Goal: Optimize memory allocation strategy and L2 cache utilization in generated Ascend kernels for large-scale training scenarios
 Issue: [Related Issue link]
 
-## Documentation Optimization
+## Operator Coverage
 
-- [ ] **Documentation structure optimization [🙋 Help Wanted]**
-Goal: Adjust existing documentation structure, carry out systematic documentation optimization, and supplement contribution guidelines, directory structure, documentation license, and other compliance-related content
+- [ ] **FP8 dtype and mixed-precision ops support [🙋 Help Wanted]**
+Goal: Support FP8 (E4M3/E5M2) dtype in tl.dot and related ops on Ascend backend, enabling FP8 training workflows
+Owner: TBD
 Issue: [Related Issue link]
+
+- [ ] **Additional Triton built-in ops support**
+Goal: Add missing built-in ops (e.g., tl.cumsum, tl.reduce with custom axis, advanced indexing) on Ascend backend
+Issue: [Related Issue link]
+
+## Usability
+
+- [ ] **Ascend backend debugging and error reporting improvement**
+Goal: Improve Ascend backend error messages, add device-side debug print and kernel profiling support
+Issue: [Related Issue link]
+
+## Sub-issues
+
+[Triton-Ascend Roadmap 2026 Q1 #xxx](link)
+[FP8 Support Phase 2 #xxx](link)
 
 ```
 
@@ -51,13 +69,14 @@ Issue: [Related Issue link]
 
 **Examples:**
 
-- `[Roadmap] MindSpeed Core Roadmap 2026 Q1`
+- `[Roadmap] Triton-Ascend Roadmap 2026 Q2`
+- `[Roadmap] Triton-Ascend Roadmap 2026 H1`
 
 ## 2. Top-level Content
 
 ### 2.1 Opening Description (optional)
 
-Provide a project overview, vision, or brief summary of the overall direction.
+Provide a project overview, vision, or brief summary of the overall direction. For example, a brief description of Triton-Ascend's current quarter goals in upstream alignment, backend performance, and operator coverage.
 
 ### 2.2 Focus Section
 
@@ -66,12 +85,11 @@ List the 3-5 most critical focus areas for this cycle, recommended to be grouped
 ```markdown
 ## Focus
 
-• New feature & function: New feature and function development...
-• Feature compatibility & reliability: Full compatibility and production-grade reliability...
-• Usability: Usability improvements...
-• Kernel optimization: Kernel optimization...
-• Reinforcement learning: Reinforcement learning framework integration...
-• Multimodal: Multimodal enhancements...
+• Upstream Compatibility: Align with upstream Triton compiler frontend and IR changes, reduce fork divergence
+• Backend Performance: Optimize Ascend NPU kernel generation and memory scheduling strategy
+• Operator Coverage: Expand supported Triton ops and data types, improve end-to-end model coverage
+• Usability: Improve debugging tools and error reporting for Ascend backend
+• Ecosystem Integration: Enhance integration with PyTorch, vLLM, and MindSpeed on Ascend backend
 ```
 
 **Characteristics:**
@@ -84,10 +102,11 @@ List the 3-5 most critical focus areas for this cycle, recommended to be grouped
 
 Group by the project's **functional domains** or **technical modules**, such as:
 
-- **Base Engine Features** - Base engine features
-- **Parallelism** - Parallel processing
-- **Server Reliability** - Server reliability
-- **Kernel** - Kernel optimization
+- **Upstream Compatibility** - Upstream Triton frontend and IR alignment
+- **Backend Performance** - Ascend NPU backend kernel generation and memory optimization
+- **Operator Coverage** - Triton built-in ops and dtype support on Ascend
+- **Usability** - Debugging tools and error reporting
+- **Ecosystem Integration** - Integration with training/inference frameworks
 
 ### 3.2 Structure of Each Module
 
@@ -117,18 +136,18 @@ Each work item should contain the following key information:
 
 - **Meaning**: Work objective or brief description
 - **Usage**: Explain the goal of this work item
-- **Example**: `Goal: Support configuring pipelines in the repository`
+- **Example**: `Goal: Support FP8 (E4M3/E5M2) dtype in tl.dot on Ascend backend`
 
 ### 4.2 Owner
 
 - **Meaning**: Responsible person
 - **Format**: `Owner: @GitHubID`
 - **Usage**: Clarify who is responsible for or leading this work item
-- **Example**: `Owner: @zhangsan`
+- **Example**: `Owner: @contributor-a`
 
 ### 4.3 Issue
 
-- **Meaning**: Associated Gitcode Issue
+- **Meaning**: Associated GitHub Issue
 - **Format**: `Issue: <Issue link>`
 - **Usage**: Track detailed design and discussion
 - **Example**: `Issue: https://github.com/triton-lang/triton-ascend/issues`
@@ -147,8 +166,8 @@ Each work item should contain the following key information:
 For work items where community developer contributions are especially welcome, it is recommended to use the **[🙋 Help Wanted]** marker to indicate:
 
 ```markdown
-- [ ] **Work item name [🙋 Help Wanted]**
-Goal: [Goal description]
+- [ ] **FP8 dtype and mixed-precision ops support [🙋 Help Wanted]**
+Goal: Support FP8 (E4M3/E5M2) dtype in tl.dot and related ops on Ascend backend
 Owner: TBD
 Issue: #123
 ```
@@ -165,6 +184,6 @@ List cross-cycle related Roadmap Issues or breakdown Issues for large work items
 ```markdown
 ## Sub-issues
 
-[xxx Roadmap (2025 Q4) #12780](link)  <!-- Related previous quarter Roadmap -->
-[Feature X Phase 2 #12800](link)      <!-- Breakdown of a large work item -->
+[Triton-Ascend Roadmap 2026 Q1 #xxx](link)  <!-- Related previous quarter Roadmap -->
+[FP8 Support Phase 2 #xxx](link)            <!-- Breakdown of a large work item -->
 ```
