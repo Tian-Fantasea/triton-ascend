@@ -17,6 +17,10 @@
 | Ce Zhu | zhucehw | 2025-12-23 |
 | Xuan Peng | HinPeng | 2025-12-23 |
 | Ziqi Hong | candyhong | 2026-03-26 |
+| Peiji Chen | zackc6 | 2026-05-07 |
+| Ingu Kung | kig9981 | 2026-05-08 |
+| Tianyao Wu | WuTYSFG | 2026-05-11 |
+| Yihan Zhou | KanuaK | 2026-05-11 |
 
 ### Contributors
 
