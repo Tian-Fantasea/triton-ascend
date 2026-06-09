@@ -28,7 +28,6 @@ These labels describe the nature of the issue.
 | `feature request` | Request for new functionality                                                                    |
 | `RFC`             | Request for Comments — significant architectural or design change requiring community discussion |
 | `new model`       | Request to add support for a new model on Ascend NPU                                             |
-| `usage`           | A usage question; no code change may be required                                                 |
 | `question`        | A general question; no code change may be required                                               |
 | `documentation`   | Improvements or corrections to documentation                                                     |
 | `installation`    | Issues related to setup and deployment                                                           |
