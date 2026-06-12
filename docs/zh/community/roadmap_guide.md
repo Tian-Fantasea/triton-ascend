@@ -5,73 +5,72 @@
 下面是一个完整的路线图 Issue 示例，展示了所有推荐元素的实际应用。建议先查看此示例获得整体印象，再阅读后续的详细规范说明。
 
 ```markdown
-创建 Issue 标题：[Roadmap] Triton-Ascend 路线图 2026 Q2
+创建 Issue 标题：[Roadmap] Triton-Ascend Roadmap 2026 Q2
 
 ---
-# Triton-Ascend 路线图 2026 Q2
+# Triton-Ascend Roadmap 2026 Q2
 
-本季度重点聚焦上游 Triton 兼容性对齐、昇腾 NPU 后端性能优化及算子覆盖扩展，持续提升编译器稳定性与生态集成能力。
+This quarter focuses on upstream Triton compatibility alignment, Ascend NPU backend performance optimization, and operator coverage expansion, continuously improving compiler stability and ecosystem integration capability.
 
-## 重点方向
+## Focus
 
-- 上游兼容性：对齐上游 Triton 编译器前端和 IR 变更，减少 fork 分叉
-- 后端性能：优化昇腾 NPU 内核生成与内存调度策略
-- 算子覆盖：扩展支持的 Triton 算子和数据类型，提升端到端模型覆盖率
-- 易用性：改进昇腾后端的调试工具和错误提示
+- Upstream Compatibility: Align with upstream Triton compiler frontend and IR changes, reduce fork divergence
+- Backend Performance: Optimize Ascend NPU kernel generation and memory scheduling strategy
+- Operator Coverage: Expand supported Triton ops and data types, improve end-to-end model coverage
+- Usability: Improve debugging tools and error reporting for Ascend backend
 
-## 上游兼容性
+## Upstream Compatibility
 
-- [ ] **Triton 3.x IR 与前端对齐**
-目标：将 fork 的 Triton 前端与上游 Triton 3.x IR 变更对齐，减少合并冲突和分叉
-Issue：[相关 Issue 链接]
+- [ ] **Triton 3.x IR and frontend alignment**
+Goal: Align forked Triton frontend with upstream Triton 3.x IR changes, reduce merge conflict and divergence
+Issue: [Related Issue link]
 
-- [ ] **Triton 语言特性对齐检查**
-目标：系统性地检查并补充昇腾后端缺失的 Triton 语言特性（如 tl.dot 新数据类型、constexpr 增强）
-Issue：[相关 Issue 链接]
+- [ ] **Triton Language feature parity check**
+Goal: Systematically check and supplement missing Triton language features (e.g., tl.dot with new dtypes, constexpr enhancements) on Ascend backend
+Issue: [Related Issue link]
 
-## 后端性能
+## Backend Performance
 
-- [ ] **昇腾 NPU 内核自动调优支持**
-目标：在昇腾后端支持 Triton autotune 机制，实现动态内核配置选择
-负责人：@contributor-a
-Issue：[相关 Issue 链接]
+- [ ] **Ascend NPU kernel auto-tuning support**
+Goal: Support Triton autotune mechanism on Ascend backend, enable dynamic kernel configuration selection
+Owner: @contributor-a
+Issue: [Related Issue link]
 
-- [ ] **内存调度与 L2 缓存优化**
-目标：优化生成昇腾内核中的内存分配策略和 L2 缓存利用率，适用于大规模训练场景
-Issue：[相关 Issue 链接]
+- [ ] **Memory scheduling and L2 cache optimization**
+Goal: Optimize memory allocation strategy and L2 cache utilization in generated Ascend kernels for large-scale training scenarios
+Issue: [Related Issue link]
 
-## 算子覆盖
+## Operator Coverage
 
-- [ ] **FP8 数据类型与混合精度算子支持 [🙋 欢迎贡献]**
-目标：在昇腾后端 tl.dot 及相关算子中支持 FP8（E4M3/E5M2）数据类型，使能 FP8 训练流程
-负责人：待定
-Issue：[相关 Issue 链接]
+- [ ] **FP8 dtype and mixed-precision ops support [🙋 Help Wanted]**
+Goal: Support FP8 (E4M3/E5M2) dtype in tl.dot and related ops on Ascend backend, enabling FP8 training workflows
+Owner: TBD
+Issue: [Related Issue link]
 
-- [ ] **更多 Triton 内置算子支持**
-目标：在昇腾后端补充缺失的内置算子（如 tl.cumsum、tl.reduce 自定义轴、高级索引）
-Issue：[相关 Issue 链接]
+- [ ] **Additional Triton built-in ops support**
+Goal: Add missing built-in ops (e.g., tl.cumsum, tl.reduce with custom axis, advanced indexing) on Ascend backend
+Issue: [Related Issue link]
 
-## 易用性
+## Usability
 
-- [ ] **昇腾后端调试与错误提示改进**
-目标：改进昇腾后端错误信息，添加设备端调试打印和内核 profiling 支持
-Issue：[相关 Issue 链接]
+- [ ] **Ascend backend debugging and error reporting improvement**
+Goal: Improve Ascend backend error messages, add device-side debug print and kernel profiling support
+Issue: [Related Issue link]
 
-## 子 Issue
+## Sub-issues
 
-[Triton-Ascend 路线图 2026 Q1 #xxx](链接)
-[FP8 支持第二阶段 #xxx](链接)
-
+[Triton-Ascend Roadmap 2026 Q1 #xxx](link)
+[FP8 Support Phase 2 #xxx](link)
 ```
 
 ## 1. 标题格式
 
-**格式：** `[Roadmap] <项目名称> 路线图 <时间范围>`，季度发布使用 Q1/Q2/Q3/Q4 标记，半年度发布使用 H1/H2 标记
+**格式：** `[Roadmap] <Project Name> Roadmap <Time Range>`，季度发布使用 Q1/Q2/Q3/Q4 标记，半年度发布使用 H1/H2 标记
 
 **示例：**
 
-- `[Roadmap] Triton-Ascend 路线图 2026 Q2`
-- `[Roadmap] Triton-Ascend 路线图 2026 H1`
+- `[Roadmap] Triton-Ascend Roadmap 2026 Q2`
+- `[Roadmap] Triton-Ascend Roadmap 2026 H1`
 
 ## 2. 顶层内容
 
@@ -84,13 +83,13 @@ Issue：[相关 Issue 链接]
 列出本周期最关键的 3-5 个重点方向，建议按项目的**功能领域**或**技术模块**分组，覆盖全局视角：
 
 ```markdown
-## 重点方向
+## Focus
 
-• 上游兼容性：对齐上游 Triton 编译器前端和 IR 变更，减少 fork 分叉
-• 后端性能：优化昇腾 NPU 内核生成与内存调度策略
-• 算子覆盖：扩展支持的 Triton 算子和数据类型，提升端到端模型覆盖率
-• 易用性：改进昇腾后端的调试工具和错误提示
-• 生态集成：增强昇腾后端与 PyTorch、vLLM 和 MindSpeed 的集成
+• Upstream Compatibility: Align with upstream Triton compiler frontend and IR changes, reduce fork divergence
+• Backend Performance: Optimize Ascend NPU kernel generation and memory scheduling strategy
+• Operator Coverage: Expand supported Triton ops and data types, improve end-to-end model coverage
+• Usability: Improve debugging tools and error reporting for Ascend backend
+• Ecosystem Integration: Enhance integration with PyTorch, vLLM, and MindSpeed on Ascend backend
 ```
 
 **特征：**
@@ -103,30 +102,30 @@ Issue：[相关 Issue 链接]
 
 按项目的**功能领域**或**技术模块**分组，例如：
 
-- **上游兼容性** - 上游 Triton 前端和 IR 对齐
-- **后端性能** - 昇腾 NPU 后端内核生成与内存优化
-- **算子覆盖** - 昇腾上的 Triton 内置算子和数据类型支持
-- **易用性** - 调试工具和错误提示
-- **生态集成** - 与训练/推理框架的集成
+- **Upstream Compatibility** - Upstream Triton frontend and IR alignment
+- **Backend Performance** - Ascend NPU backend kernel generation and memory optimization
+- **Operator Coverage** - Triton built-in ops and dtype support on Ascend
+- **Usability** - Debugging tools and error reporting
+- **Ecosystem Integration** - Integration with training/inference frameworks
 
 ### 3.2 各模块结构
 
 每个模块包含多个**具体工作项**，格式如下：
 
 ```markdown
-## [模块名称]
+## [Module Name]
 
-- [ ] **工作项名称/特性描述**
-目标：[目标描述]
-负责人：@GitHubID      [可选]
-Issue：[相关 Issue 链接]   [可选]
-PR：[相关 PR 链接]         [可选]
+- [ ] **Work item name/feature description**
+Goal: [Goal description]
+Owner: @GitHubID      [optional]
+Issue: [Related Issue link]   [optional]
+PR: [Related PR link]         [optional]
 
-- [ ] **另一工作项**
-目标：[目标描述]
-负责人：@GitHubID      [可选]
-Issue：[相关 Issue 链接]   [可选]
-PR：[相关 PR 链接]         [可选]
+- [ ] **Another work item**
+Goal: [Goal description]
+Owner: @GitHubID      [optional]
+Issue: [Related Issue link]   [optional]
+PR: [Related PR link]         [optional]
 ```
 
 ## 4. 关键元数据字段
@@ -167,10 +166,10 @@ PR：[相关 PR 链接]         [可选]
 对于特别欢迎社区开发者贡献的工作项，建议使用 **[🙋 欢迎贡献]** 标记来标识：
 
 ```markdown
-- [ ] **FP8 数据类型与混合精度算子支持 [🙋 欢迎贡献]**
-目标：在昇腾后端 tl.dot 及相关算子中支持 FP8（E4M3/E5M2）数据类型，使能 FP8 训练流程
-负责人：待定
-Issue：#123
+- [ ] **FP8 dtype and mixed-precision ops support [🙋 Help Wanted]**
+Goal: Support FP8 (E4M3/E5M2) dtype in tl.dot and related ops on Ascend backend
+Owner: TBD
+Issue: #123
 ```
 
 ### 5.2 子 Issue
@@ -183,8 +182,8 @@ Issue：#123
 - **子 Issue 章节**：用于关联其他周期的路线图 Issue（如上季度未完成的工作），或将大工作项分解为多个独立跟踪的子 Issue
 
 ```markdown
-## 子 Issue
+## Sub-issues
 
-[Triton-Ascend 路线图 2026 Q1 #xxx](链接)  <!-- 相关上季度路线图 -->
-[FP8 支持第二阶段 #xxx](链接)            <!-- 大工作项的分解 -->
+[Triton-Ascend Roadmap 2026 Q1 #xxx](link)  <!-- Related previous quarter Roadmap -->
+[FP8 Support Phase 2 #xxx](link)            <!-- Breakdown of a large work item -->
 ```
