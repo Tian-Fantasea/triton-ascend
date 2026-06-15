@@ -92,3 +92,5 @@ Triton Ascend
     community/community_technical_meeting.md
     community/release_policy.md
     community/roadmap_guide.md
+    community/MAINTAINER.md
+    community/CONTRIBUTING_zh.md
