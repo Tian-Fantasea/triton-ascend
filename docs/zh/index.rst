@@ -84,3 +84,11 @@ Triton Ascend
     :caption: 常见问题
 
     FAQ.md
+
+.. toctree::
+    :maxdepth: 1
+    :caption: 社区运作及版本策略
+
+    community/community_technical_meeting.md
+    community/release_policy.md
+    community/roadmap_guide.md
