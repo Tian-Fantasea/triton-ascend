@@ -87,7 +87,7 @@ Triton Ascend
 
 .. toctree::
     :maxdepth: 1
-    :caption: 社区运作及版本策略
+    :caption: 社区治理
 
     community/community_technical_meeting.md
     community/release_policy.md
