@@ -87,10 +87,17 @@ Triton Ascend
 
 .. toctree::
     :maxdepth: 1
+    :caption: 贡献指南
+
+    community/CONTRIBUTING_zh.md
+    community/roadmap_guide.md
+
+.. toctree::
+    :maxdepth: 1
     :caption: 社区治理
 
+    community/GOVERNANCE_zh.md
     community/community_technical_meeting.md
     community/release_policy.md
-    community/roadmap_guide.md
     community/MAINTAINERS.md
-    community/CONTRIBUTING_zh.md
+    community/contributor.md
