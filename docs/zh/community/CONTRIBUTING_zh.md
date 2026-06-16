@@ -1,1 +1,1 @@
-CONTRIBUTING_zh.md
+../../../CONTRIBUTING_zh.md
