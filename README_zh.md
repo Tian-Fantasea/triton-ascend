@@ -126,4 +126,4 @@ Triton-Ascend 所支持的操作系统与 CANN 一致。请参考 CANN 官方文
 
 ## 社区与贡献
 
-欢迎参与Triton-Ascend的开发及代码贡献，详情请参阅 [贡献指南](./CONTRIBUTING_zh.md)
+欢迎参与Triton-Ascend的开发及代码贡献，详情请参阅 [贡献指南](./docs/zh/community/CONTRIBUTING_zh.md)
