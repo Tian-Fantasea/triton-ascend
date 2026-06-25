@@ -118,7 +118,7 @@ Triton-Ascend 所支持的操作系统与 CANN 一致。请参考 CANN 官方文
 
 ## 安全声明
 
-我们重视开发者在使用Triton-Ascend时的信息安全，安全防护建议与相关信息请见 [安全声明](./SECURITYNOTE.md)
+我们重视开发者在使用Triton-Ascend时的信息安全，安全防护建议与相关信息请见 [安全声明](./docs/zh/community/SECURITYNOTE_zh.md)
 
 ## 许可证信息
 
