@@ -52,6 +52,7 @@ triton_dir = os.path.dirname(os.path.abspath(__file__))
 os.environ.setdefault("TRITON_BUILD_WITH_CCACHE", "true")
 os.environ.setdefault("TRITON_BUILD_WITH_CLANG_LLD", "true")
 os.environ.setdefault("TRITON_BUILD_PROTON", "OFF")
+os.environ.setdefault("TRITON_BUILD_DISTRIBUTED", "OFF")
 os.environ.setdefault("TRITON_WHEEL_NAME", "triton-ascend")
 os.environ.setdefault("TRITON_APPEND_CMAKE_ARGS", "-DTRITON_BUILD_UT=OFF")
 
@@ -204,11 +205,12 @@ def is_linux_os(os_id):
 
 
 def get_llvm_patch_hash():
-    """Compute a hash of all LLVM patch files, matching the llvm-build workflow naming."""
-    patch_dir = os.path.join(get_base_dir(), "third_party", "ascend", "llvm_patch")
+    """Compute a hash of LLVM patch files under third_party/ascend/patch."""
+    patch_dir = os.path.join(get_base_dir(), "third_party", "ascend", "patch")
     if os.path.isdir(patch_dir):
-        patch_files = sorted(f for f in os.listdir(patch_dir)
-                             if f.endswith('.patch') and os.path.isfile(os.path.join(patch_dir, f)))
+        patch_files = sorted(
+            f for f in os.listdir(patch_dir)
+            if f.startswith("llvm_patch_") and f.endswith(".patch") and os.path.isfile(os.path.join(patch_dir, f)))
     else:
         patch_files = []
     if not patch_files:
@@ -245,14 +247,10 @@ def get_llvm_package_info():
                 # Ubuntu 22 LTS (v2.35)
                 # Ubuntu 20 LTS (v2.31)
                 system_suffix = "ubuntu-x64"
-            elif vglibc > 217:
+            else:
                 # Manylinux_2.28 (v2.28)
                 # AlmaLinux 8 (v2.28)
                 system_suffix = "almalinux-x64"
-            else:
-                # Manylinux_2014 (v2.17)
-                # CentOS 7 (v2.17)
-                system_suffix = "centos-x64"
         else:
             print(
                 f"LLVM pre-compiled image is not available for {system}-{arch}. Proceeding with user-configured LLVM from source build."
@@ -340,7 +338,11 @@ def get_thirdparty_packages(packages: list):
                         file.extractall(path=package_root_dir)
                 else:
                     with tarfile.open(fileobj=response, mode="r|*") as file:
-                        file.extractall(path=package_root_dir)
+                        # Use extractall without filter for Python version < 3.12 compatibility
+                        if hasattr(tarfile, 'data_filter'):
+                            file.extractall(path=package_root_dir, filter="data")
+                        else:
+                            file.extractall(path=package_root_dir)
             # write version url to package_dir
             with open(os.path.join(package_dir, "version.txt"), "w") as f:
                 f.write(p.url)
@@ -382,8 +384,12 @@ def download_and_copy(name, src_func, dst_path, variable, version, url_func):
         download = download or curr_version.group(1) != version
     if download:
         print(f'downloading and extracting {url} ...')
-        file = tarfile.open(fileobj=open_url(url), mode="r|*")
-        file.extractall(path=tmp_path)
+        with open_url(url) as url_file, tarfile.open(fileobj=url_file, mode="r|*") as tar_file:
+            # Use extractall without filter for Python version < 3.12 compatibility
+            if hasattr(tarfile, 'data_filter'):
+                tar_file.extractall(path=tmp_path, filter="data")
+            else:
+                tar_file.extractall(path=tmp_path)
     os.makedirs(os.path.split(dst_path)[0], exist_ok=True)
     print(f'copy {src_path} to {dst_path} ...')
     if os.path.isdir(src_path):
@@ -486,7 +492,8 @@ class CMakeBuild(build_ext):
         os.environ['LD_LIBRARY_PATH'] = f'{hitest_home}:{current_ld_path}'
 
     def run(self):
-        download_and_copy_dependencies()
+        #download_and_copy_dependencies()
+        apply_triton_ascend_patch()
 
         try:
             out = subprocess.check_output(["cmake", "--version"])
@@ -613,6 +620,11 @@ class CMakeBuild(build_ext):
         if check_env_flag("TRITON_BUILD_PROTON", "ON"):  # Default ON
             cmake_args += self.get_proton_cmake_args()
 
+        if check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+            cmake_args += ["-DTRITON_BUILD_DISTRIBUTED=ON"]
+        else:
+            cmake_args += ["-DTRITON_BUILD_DISTRIBUTED=OFF"]
+
         if is_offline_build():
             # unit test builds fetch googletests from GitHub
             cmake_args += ["-DTRITON_BUILD_UT=OFF"]
@@ -635,7 +647,7 @@ class CMakeBuild(build_ext):
 
         # Copy triton-mlir-opt tool to extdir for runtime use
         # This tool is needed for converting MLIR to Bytecode
-        triton_mlir_opt_src = os.path.join(cmake_dir, "bin", "triton-mlir-opt")
+        triton_mlir_opt_src = os.path.join(cmake_dir, "third_party", "ascend", "bin", "triton-mlir-opt")
         if os.path.exists(triton_mlir_opt_src):
             triton_mlir_opt_dst = os.path.join(extdir, "triton-mlir-opt")
             shutil.copy2(triton_mlir_opt_src, triton_mlir_opt_dst)
@@ -670,6 +682,21 @@ class CMakeBuild(build_ext):
             print(f"Copied triton-opt to {triton_opt_dst}")
 
 
+def ensure_distributed_submodule():
+    if not check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+        return
+    distributed_dir = Path(triton_dir) / "third_party" / "ascend" / "Triton-distributed-ascend"
+    if not (distributed_dir / "CMakeLists.txt").is_file() and is_git_repo():
+        subprocess.check_call(
+            ["git", "submodule", "update", "--init", "--", "third_party/ascend/Triton-distributed-ascend"],
+            cwd=triton_dir)
+    if not (distributed_dir / "CMakeLists.txt").is_file():
+        raise RuntimeError(f"Triton-Distributed submodule is not initialized: {distributed_dir}")
+
+
+ensure_distributed_submodule()
+
+
 def download_and_copy_dependencies():
     nvidia_version_path = os.path.join(get_base_dir(), "cmake", "nvidia-toolchain-version.json")
     with open(nvidia_version_path, "r") as nvidia_version_file:
@@ -683,6 +710,17 @@ def download_and_copy_dependencies():
         dst_path="bin/ptxas",
         variable="TRITON_PTXAS_PATH",
         version=NVIDIA_TOOLCHAIN_VERSION["ptxas"],
+        url_func=lambda system, arch, version:
+        f"https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/{system}-{arch}/cuda_nvcc-{system}-{arch}-{version}-archive.tar.xz",
+    )
+
+    # We download a separate ptxas for blackwell, since there are some bugs when using it for hopper
+    download_and_copy(
+        name="nvcc",
+        src_func=lambda system, arch, version: f"cuda_nvcc-{system}-{arch}-{version}-archive/bin/ptxas{exe_extension}",
+        dst_path="bin/ptxas-blackwell",
+        variable="TRITON_PTXAS_BLACKWELL_PATH",
+        version=NVIDIA_TOOLCHAIN_VERSION["ptxas-blackwell"],
         url_func=lambda system, arch, version:
         f"https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/{system}-{arch}/cuda_nvcc-{system}-{arch}-{version}-archive.tar.xz",
     )
@@ -706,14 +744,15 @@ def download_and_copy_dependencies():
         url_func=lambda system, arch, version:
         f"https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvdisasm/{system}-{arch}/cuda_nvdisasm-{system}-{arch}-{version}-archive.tar.xz",
     )
+    crt = "crt" if int(NVIDIA_TOOLCHAIN_VERSION["cudacrt"].split(".")[0]) >= 13 else "nvcc"
     download_and_copy(
         name="nvcc",
-        src_func=lambda system, arch, version: f"cuda_nvcc-{system}-{arch}-{version}-archive/include",
+        src_func=lambda system, arch, version: f"cuda_{crt}-{system}-{arch}-{version}-archive/include",
         dst_path="include",
         variable="TRITON_CUDACRT_PATH",
         version=NVIDIA_TOOLCHAIN_VERSION["cudacrt"],
         url_func=lambda system, arch, version:
-        f"https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/{system}-{arch}/cuda_nvcc-{system}-{arch}-{version}-archive.tar.xz",
+        f"https://developer.download.nvidia.com/compute/cuda/redist/cuda_{crt}/{system}-{arch}/cuda_{crt}-{system}-{arch}-{version}-archive.tar.xz",
     )
     download_and_copy(
         name="cudart",
@@ -773,6 +812,10 @@ def get_package_dirs():
         yield ("triton.profiler", "third_party/proton/proton")
         yield ("triton.profiler.hooks", "third_party/proton/proton/hooks")
 
+    if check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+        yield ("triton_dist", os.path.join("third_party", "ascend", "Triton-distributed-ascend", "python",
+                                           "triton_dist"))
+
 
 def get_packages():
     yield from find_packages(where="python")
@@ -794,6 +837,19 @@ def get_packages():
 
     if check_env_flag("TRITON_BUILD_PROTON", "ON"):  # Default ON
         yield "triton.profiler"
+
+    if check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+        distributed_pkg_root = os.path.join("third_party", "ascend", "Triton-distributed-ascend", "python",
+                                            "triton_dist")
+        if os.path.isdir(distributed_pkg_root):
+            # Walk the directory tree directly. find_packages() cannot reach
+            # this subtree (it lives outside of `python/`) and would also
+            # silently drop PEP 420 namespace packages such as
+            # `triton_dist/language/extra/` which only contain loose .py files.
+            for dirpath, _dirnames, filenames in os.walk(distributed_pkg_root):
+                if "__init__.py" in filenames or any(f.endswith(".py") for f in filenames):
+                    rel = os.path.relpath(dirpath, distributed_pkg_root).replace(os.sep, ".")
+                    yield "triton_dist" if rel == "." else f"triton_dist.{rel}"
 
 
 def add_link_to_backends(external_only):
@@ -829,10 +885,20 @@ def add_link_to_proton():
     update_symlink(proton_install_dir, proton_dir)
 
 
+def add_link_to_distributed():
+    distributed_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "third_party", "ascend", "Triton-distributed-ascend", "python",
+                     "triton_dist"))
+    distributed_install_dir = os.path.join(os.path.dirname(__file__), "python", "triton_dist")
+    update_symlink(distributed_install_dir, distributed_dir)
+
+
 def add_links(external_only):
     add_link_to_backends(external_only=external_only)
     if not external_only and check_env_flag("TRITON_BUILD_PROTON", "ON"):  # Default ON
         add_link_to_proton()
+    if not external_only and check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+        add_link_to_distributed()
 
 
 class plugin_bdist_wheel(bdist_wheel):
@@ -944,11 +1010,69 @@ def get_git_version_suffix():
         return get_git_commit_hash()
 
 
+def apply_patch(patch_path):
+    try:
+        subprocess.run(["git", "apply", patch_path], check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        raise RuntimeError(f"patch({patch_path}) failed")
+    except FileNotFoundError:
+        raise RuntimeError(f"patch({patch_path}) not found.")
+
+
+def checkout_file(files):
+    try:
+        subprocess.run(["git", "checkout", "--"] + files, check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        raise RuntimeError(f"init code failed,list:{files}")
+
+
+def apply_triton_ascend_patch():
+    patch_path = os.path.join("third_party", "ascend", "patch")
+    dev_patch = os.path.join(patch_path, "triton-ascend-dev-3.6.0.patch")
+    patch = os.path.join(patch_path, "triton-ascend-3.6.0.patch")
+    patch_files = [
+        "CMakeLists.txt",
+        "include/triton/Dialect/Triton/IR/TritonAttrDefs.td",
+        "lib/Dialect/Triton/IR/Traits.cpp",
+        "python/src/ir.cc",
+        "python/triton/_utils.py",
+        "python/triton/compiler/code_generator.py",
+        "python/triton/compiler/compiler.py",
+        "python/triton/compiler/errors.py",
+        "python/triton/language/math.py",
+        "python/triton/language/semantic.py",
+        "python/triton/language/standard.py",
+        "python/triton/runtime/interpreter.py",
+        "python/triton/runtime/jit.py",
+        "bin/RegisterTritonDialects.h",
+        "bin/triton-opt.cpp",
+        "bin/CMakeLists.txt",
+    ]
+    dev_patch_files = [
+        "python/triton/runtime/autotuner.py",
+    ]
+    checkout_file(dev_patch_files)
+    apply_patch(dev_patch)
+    checkout_file(patch_files)
+    apply_patch(patch)
+
+
+def get_triton_version_suffix():
+    # Either "" or "+<githash>", "<githash>" itself does not contain any plus-characters.
+    git_sfx = get_git_version_suffix()
+    # Should start with "+" that will replaced with "-" if needed
+    env_sfx = os.environ.get("TRITON_WHEEL_VERSION_SUFFIX", "")
+    # version suffix can only contain one plus-character
+    if "+" in git_sfx and "+" in env_sfx:
+        env_sfx = env_sfx.replace("+", "-")
+    return git_sfx + env_sfx
+
+
 # keep it separate for easy substitution
-TRITON_VERSION = "3.5.0" + get_git_version_suffix() + os.environ.get("TRITON_WHEEL_VERSION_SUFFIX", "")
+TRITON_VERSION = "3.6.0" + get_triton_version_suffix()
 
 # Dynamically define supported Python versions and classifiers
-MIN_PYTHON = (3, 9)
+MIN_PYTHON = (3, 10)
 MAX_PYTHON = (3, 14)
 
 PYTHON_REQUIRES = f">={MIN_PYTHON[0]}.{MIN_PYTHON[1]},<{MAX_PYTHON[0]}.{MAX_PYTHON[1] + 1}"
@@ -971,7 +1095,7 @@ def get_default_version():
     version_file = Path(__file__).parent / "version.txt"
     if version_file.exists():
         return version_file.read_text().strip()
-    return "3.5.0"
+    return "3.6.0"
 
 
 def get_version():
@@ -1000,8 +1124,8 @@ ARCHITECTURE_ALIASES = {
 }
 
 ARCHITECTURE_DEPENDENCIES = {
-    "x86_64": ["triton==3.5.0"],
-    "arm": ["triton==3.5.0"],
+    "x86_64": ["triton==3.6.0"],
+    "arm": ["triton==3.6.0"],
 }
 
 
@@ -1038,6 +1162,13 @@ if not os.path.exists(readme):
 with open(readme, encoding="utf-8") as fdesc:
     long_description = fdesc.read()
 
+package_data = {}
+if check_env_flag("TRITON_BUILD_DISTRIBUTED", "ON"):
+    # triton_dist lives outside of python/ and contains PEP 420 namespace
+    # packages (e.g. triton_dist/language/extra/) whose loose .py files
+    # would otherwise be dropped from the wheel.
+    package_data["triton_dist"] = ["*.py", "*.pyi"]
+
 setup(
     name=get_package_name(),
     version=get_version(),
@@ -1047,6 +1178,7 @@ setup(
     long_description=long_description,
     packages=list(get_packages()),
     package_dir=dict(get_package_dirs()),
+    package_data=package_data,
     entry_points=get_entry_points(),
     include_package_data=True,
     ext_modules=[CMakeExtension("triton", "triton/_C/")],

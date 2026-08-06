@@ -9,8 +9,6 @@ from triton.runtime import driver
 from .._C.libtriton import ir
 from . import core as tl
 
-from . import is_compile_on_910_95
-
 T = TypeVar('T')
 TensorTy = TypeVar('TensorTy')
 
@@ -339,7 +337,6 @@ class TritonSemantic(Generic[TensorTy]):
         other_scalar_ty = other.type.scalar
         # float % float
         if scalar_ty.is_floating():
-            # input - input.div(other, rounding_mode="floor") * other
             return self.tensor(self.builder.create_frem(input.handle, other.handle), input.type)
         # % int
         elif scalar_ty.is_int():
@@ -347,9 +344,6 @@ class TritonSemantic(Generic[TensorTy]):
                 raise TypeError("Cannot mod " + scalar_ty.__repr__() + " by " + other_scalar_ty.__repr__() + " "
                                 "because they have different signedness;"
                                 "this is unlikely to result in a useful answer. Cast them to the same signedness.")
-            if hasattr(input, 'was_bool_to_int8'):
-                false_val = self.builder.get_int1(False)
-                return self.tensor(false_val, tl.int1)
             if scalar_ty.is_int_signed():
                 return self.tensor(self.builder.create_srem(input.handle, other.handle), input.type)
             else:
@@ -435,61 +429,22 @@ class TritonSemantic(Generic[TensorTy]):
         return self.tensor(self.builder.create_xor(input.handle, other.handle), input.type)
 
     def logical_and(self, input: TensorTy, other: TensorTy) -> TensorTy:
-        dst_sca_ty = tl.dtype("int1")
-        dst_bits = dst_sca_ty.primitive_bitwidth
-        if hasattr(input, 'was_bool_to_int8'):
-            assert input.type.scalar.is_int8(), "input wat bool to int8. However, input.type is not int8."
-            input = self.cast(input, tl.int1)
         if not input.type.is_int1():
-            src_sca_ty = input.type.scalar
-            src_bits = src_sca_ty.primitive_bitwidth
-            if src_bits == dst_bits or src_sca_ty.is_ptr() or dst_sca_ty.is_ptr():
-                input = self.bitcast(input, tl.int1)
-            else:
-                input = self.not_equal(input, 0)
-        if hasattr(other, 'was_bool_to_int8'):
-            assert other.type.scalar.is_int8(), "Other input wat bool to int8. However, other input.type is not int8."
-            other = self.cast(other, tl.int1)
+            input = self.bitcast(input, tl.int1)
         if not other.type.is_int1():
-            src_sca_ty = other.type.scalar
-            src_bits = src_sca_ty.primitive_bitwidth
-            if src_bits == dst_bits or src_sca_ty.is_ptr() or dst_sca_ty.is_ptr():
-                other = self.bitcast(other, tl.int1)
-            else:
-                other = self.not_equal(other, 0)
+            other = self.bitcast(other, tl.int1)
         return self.and_(input, other)
 
     def logical_or(self, input: TensorTy, other: TensorTy) -> TensorTy:
-        dst_sca_ty = tl.dtype("int1")
-        dst_bits = dst_sca_ty.primitive_bitwidth
-        if hasattr(input, 'was_bool_to_int8'):
-            assert input.type.scalar.is_int8(), "input wat bool to int8. However, input.type is not int8."
-            input = self.cast(input, tl.int1)
         if not input.type.is_int1():
-            src_sca_ty = input.type.scalar
-            src_bits = src_sca_ty.primitive_bitwidth
-            if src_bits == dst_bits or src_sca_ty.is_ptr() or dst_sca_ty.is_ptr():
-                input = self.bitcast(input, tl.int1)
-            else:
-                input = self.not_equal(input, 0)
-        if hasattr(other, 'was_bool_to_int8'):
-            assert other.type.scalar.is_int8(), "Other wat bool to int8. However, other.type is not int8."
-            other = self.cast(other, tl.int1)
+            input = self.bitcast(input, tl.int1)
         if not other.type.is_int1():
-            src_sca_ty = other.type.scalar
-            src_bits = src_sca_ty.primitive_bitwidth
-            if src_bits == dst_bits or src_sca_ty.is_ptr() or dst_sca_ty.is_ptr():
-                other = self.bitcast(other, tl.int1)
-            else:
-                other = self.not_equal(other, 0)
+            other = self.bitcast(other, tl.int1)
         return self.or_(input, other)
 
     def not_(self, input: TensorTy):
-        if hasattr(input, 'was_bool_to_int8'):
-            assert input.type.scalar.is_int8(), "input wat bool to int8. However, input.type is not int8."
-            input = self.cast(input, tl.int1)
-        if input.type.scalar.is_floating():
-            raise TypeError(f"unexpected type {input.type.scalar}")
+        if not input.type.is_int1():
+            input = self.bitcast(input, tl.int1)
         return self.invert(input)
 
     def lshr(self, input: TensorTy, other: TensorTy) -> TensorTy:
@@ -513,22 +468,14 @@ class TritonSemantic(Generic[TensorTy]):
 
     def minus(self, input: TensorTy) -> TensorTy:
         input_sca_ty = input.type.scalar
-        if hasattr(input, 'was_bool_to_int8'):
-            if input.type.scalar.is_int8():
-                raise TypeError("unexpected type bool")
         if input_sca_ty.is_ptr():
             raise ValueError("wrong type argument to unary minus (" + input_sca_ty.__repr__() + ")")
         _0 = self.tensor(self.builder.get_null_value(input_sca_ty.to_ir(self.builder)), input_sca_ty)
         return self.sub(_0, input, True)
 
     def invert(self, input: TensorTy) -> TensorTy:
-        if hasattr(input, 'was_bool_to_int8'):
-            assert input.type.scalar.is_int8(), "input wat bool to int8. However, input.type is not int8."
-            input = self.cast(input, tl.int1)
         input_sca_ty = input.type.scalar
-        if input_sca_ty.is_floating():
-            raise TypeError(f"unexpected type {input_sca_ty}")
-        if input_sca_ty.is_ptr():
+        if input_sca_ty.is_ptr() or input_sca_ty.is_floating():
             raise ValueError("wrong type argument to unary invert (" + input_sca_ty.__repr__() + ")")
         _1 = self.tensor(self.builder.get_all_ones_value(input_sca_ty.to_ir(self.builder)), input_sca_ty)
         return self.xor_(input, _1)
@@ -632,11 +579,8 @@ class TritonSemantic(Generic[TensorTy]):
         if end <= start:
             raise ValueError("arange's end argument must be greater than the start argument")
         range = end - start
-        # Check if compile_mode is simt, then range must be a power of 2
-        if self.builder.is_simt_mode():
-            # Check if range is a power of 2
-            if (range & (range - 1)) != 0:
-                raise ValueError("arange's range must be a power of 2")
+        if (range & (range - 1)) != 0:
+            raise ValueError("arange's range must be a power of 2")
         shape = [range]
         if ret_ty is None:
             ret_ty = tl.block_type(tl.int32, shape)
@@ -1121,19 +1065,13 @@ class TritonSemantic(Generic[TensorTy]):
 
         # Build IR
         if mask is None:
-            load_handle = self.builder.create_load(ptr.handle, cache, eviction, is_volatile)
+            ret = self.tensor(self.builder.create_load(ptr.handle, cache, eviction, is_volatile), dst_ty)
         else:
-            load_handle = self.builder.create_masked_load(ptr.handle, mask.handle, other.handle if other else None,
-                                                          cache, eviction, is_volatile)
-
+            ret = self.tensor(
+                self.builder.create_masked_load(ptr.handle, mask.handle, other.handle if other else None, cache,
+                                                eviction, is_volatile), dst_ty)
         if is_bool:
-            load_handle.set_attr("was_bool_to_int8", self.builder.get_bool_attr(True))
-
-        ret = self.tensor(load_handle, dst_ty)
-        # Do not cast back to int1 when is_bool=true. We directly use the int8 tensor given by tl.load
-        if is_bool:
-            ret.was_bool_to_int8 = True
-
+            ret = self.cast(ret, tl.int1)
         return ret
 
     def load(self, ptr: TensorTy, mask: Optional[TensorTy], other: Optional[TensorTy], boundary_check: Tuple,
@@ -1318,9 +1256,13 @@ class TritonSemantic(Generic[TensorTy]):
 
         # Make `mask` and `val` into the same shape as `ptr`
         if ptr.type.is_block():
-            val = self.broadcast_impl_shape(val, ptr.type.get_block_shapes())
-            if mask is not None:
-                mask = self.broadcast_impl_shape(mask, ptr.type.get_block_shapes())
+            ptr_shape = ptr.shape
+            if mask is None:
+                ptr, val = self.broadcast_tensors(ptr, val)
+            else:
+                ptr, val, mask = self.broadcast_tensors(ptr, val, mask)
+            if ptr_shape != ptr.shape:
+                raise ValueError(f"Expected pointer argument to have shape {ptr.shape} but got {ptr_shape}")
 
         ptr_ty = ptr.type.scalar
         elt_ty = ptr_ty.element_ty
@@ -1376,6 +1318,13 @@ class TritonSemantic(Generic[TensorTy]):
             raise ValueError("Pointer argument of store instruction is " + ptr.type.__repr__())
         if ptr.type.is_const() or ptr.type.element_ty.is_const():
             raise ValueError("Cannot store to a constant pointer")
+        element_ty = ptr.type.scalar.element_ty
+        if element_ty is tl.float16 and op != 'add':
+            raise ValueError("atomic_" + op + " does not support fp16")
+        if element_ty is tl.bfloat16 and op != 'add':
+            raise ValueError("atomic_" + op + " does not support bf16")
+        if element_ty in [tl.int16, tl.uint16] or element_ty.primitive_bitwidth < 16:
+            raise ValueError("atomic_" + op + " does not support " + str(element_ty))
         if ptr.type.is_block():
             if mask is not None:
                 mask = self.broadcast_impl_shape(mask, ptr.type.get_block_shapes())
@@ -1484,6 +1433,10 @@ class TritonSemantic(Generic[TensorTy]):
         input_precision = input_precision.upper()
         if input_precision == "TF32X3":
             input_precision = "TF32x3"
+        if input_precision == "BF16X3":
+            input_precision = "BF16x3"
+        if input_precision == "BF16X6":
+            input_precision = "BF16x6"
         return getattr(ir.INPUT_PRECISION, input_precision)
 
     def dot(self, lhs: TensorTy, rhs: TensorTy, acc: TensorTy, input_precision: Optional[str],
@@ -1557,6 +1510,7 @@ class TritonSemantic(Generic[TensorTy]):
 
         M = lhs.type.shape[-2]
         N = rhs.type.shape[-1]
+        K = lhs.type.shape[-1]
         B = lhs.type.shape[0] if lhs_rank == 3 else None
         ret_ty = tl.block_type(ret_scalar_ty, [B, M, N] if B else [M, N])
         if acc is None:
@@ -1572,9 +1526,9 @@ class TritonSemantic(Generic[TensorTy]):
             else:
                 max_num_imprecise_acc = 0
         else:
-            if lhs.dtype.is_fp8() and rhs.dtype.is_fp8() and max_num_imprecise_acc > lhs.shape[-1].value:
-                raise ValueError(
-                    f"max_num_imprecise_acc ({max_num_imprecise_acc}) must be <= K ({lhs.shape[-1].value})")
+            if lhs.dtype.is_fp8() and rhs.dtype.is_fp8() and max_num_imprecise_acc > K:
+                raise ValueError(f"max_num_imprecise_acc ({max_num_imprecise_acc}) must be <= K ({K})")
+
         return self.tensor(
             self.builder.create_dot(lhs.handle, rhs.handle, acc_handle, input_precision, max_num_imprecise_acc), ret_ty)
 
@@ -1602,19 +1556,24 @@ class TritonSemantic(Generic[TensorTy]):
             assert val.dtype == unsigned_ty, f"Unexpected dtype for {float_format}. Got {val.dtype}"
             return self.bitcast(val, triton_ty)
 
+    def verify_scaled_shape(self, M, N, K, lhs_scale, rhs_scale):
+        if lhs_scale is not None:
+            scale_factor = 16 if lhs_scale.dtype.is_fp8e4nv() else 32
+            lhs_scale_shape = lhs_scale.type.shape
+            assert lhs_scale_shape == [
+                M, K // scale_factor
+            ], f"lhs_scale must be a tensor of shape [{M}, {K // scale_factor}]. Got {lhs_scale_shape}"
+        if rhs_scale is not None:
+            scale_factor = 16 if rhs_scale.dtype.is_fp8e4nv() else 32
+            rhs_scale_shape = rhs_scale.type.shape
+            assert rhs_scale_shape == [
+                N, K // scale_factor
+            ], f"rhs_scale must be a tensor of shape [{N}, {K // scale_factor}]. Got {rhs_scale_shape}"
+
     def dot_scaled(self, lhs: TensorTy, lhs_scale: TensorTy, lhs_format: str, rhs: TensorTy,
                    rhs_scale: Optional[TensorTy], rhs_format: str, acc: TensorTy | None, fast_math: bool,
                    lhs_k_pack: bool, rhs_k_pack: bool, out_dtype: tl.dtype) -> TensorTy:
         assert lhs.type.is_block() and rhs.type.is_block()
-        if is_compile_on_910_95:
-            assert lhs.dtype in [tl.float16, tl.bfloat16, tl.uint8, tl.float8e5,
-                                 tl.float8e4nv], "lhs matrix dtype must be in [bf16, fp16, uint8, e5m2, e4m3]"
-            assert rhs.dtype in [tl.float16, tl.bfloat16, tl.uint8, tl.float8e5,
-                                 tl.float8e4nv], "rhs matrix dtype must be in [bf16, fp16, uint8, e5m2, e4m3]"
-        else:
-            assert lhs.dtype == tl.bfloat16 or lhs.dtype == tl.float16, "lhs matrix dtype must be bf16 or fp16"
-            assert rhs.dtype == tl.bfloat16 or lhs.dtype == tl.float16, "rhs matrix dtype must be bf16 or fp16"
-        assert lhs.dtype == rhs.dtype, "lhs rhs matrix must get same dtype"
         #TODO: validate types.
         lhs_rank = len(lhs.shape)
         rhs_rank = len(rhs.shape)
@@ -1623,40 +1582,13 @@ class TritonSemantic(Generic[TensorTy]):
         rhs_format: str = rhs_format.value
         lhs_format_enum = self._str_to_fp_type(lhs_format)
         rhs_format_enum = self._str_to_fp_type(rhs_format)
-        if is_compile_on_910_95:
-            allowed_formats = {"bf16", "fp16", "e4m3", "e5m2", "e2m1"}
-        else:
-            allowed_formats = {"bf16", "fp16"}  # unsupported fp8/4 dtype: "e2m1", "e4m3", "e5m2"
+        allowed_formats = {"e2m1", "e4m3", "e5m2", "bf16", "fp16"}
         assert lhs_format in allowed_formats, f"NYI: lhs_format {lhs_format}"
         assert rhs_format in allowed_formats, f"NYI: rhs_format {rhs_format}"
         rhs_scale_is_none = rhs_scale is None or (isinstance(rhs_scale, tl.constexpr) and rhs_scale.value is None)
         lhs_scale_is_none = lhs_scale is None or (isinstance(lhs_scale, tl.constexpr) and lhs_scale.value is None)
-        assert isinstance(lhs_scale, tl.tensor) and (lhs_scale.dtype == tl.int8 or lhs_scale.dtype
-                                                     == tl.uint8), "lhs_scale must be int8 or uint8 tensor"
-        if not rhs_scale_is_none:
-            assert isinstance(rhs_scale, tl.tensor) and (rhs_scale.dtype == tl.int8 or rhs_scale.dtype
-                                                         == tl.uint8), "rhs_scale must be int8 or uint8 tensor"
         lhs = self._bitcast_to_fp_type(lhs, lhs_format)
         rhs = self._bitcast_to_fp_type(rhs, rhs_format)
-        assert lhs_k_pack or lhs_format == "e2m1", "only mxfp4 inputs can be packed along a dimension different than K"
-        assert rhs_k_pack or rhs_format == "e2m1", "only mxfp4 inputs can be packed along a dimension different than K"
-
-        lhs_k_pack_v = lhs_k_pack.value if isinstance(lhs_k_pack, tl.constexpr) else lhs_k_pack
-        rhs_k_pack_v = rhs_k_pack.value if isinstance(rhs_k_pack, tl.constexpr) else rhs_k_pack
-
-        if lhs_k_pack_v is False:
-            dims = (1, 0)
-            tmp_lhs = self.permute(lhs, dims)
-            lhs = self.reshape(tmp_lhs, (lhs.shape[0], lhs.shape[1]), True)
-
-        if rhs_k_pack_v is False:
-            dims = (1, 0)
-            tmp_rhs = self.permute(rhs, dims)
-            rhs = self.reshape(tmp_rhs, (rhs.shape[0], rhs.shape[1]), True)
-
-        assert lhs.type.shape[-1] == rhs.type.shape[-2], (
-            f"lhs last dimension (columns) {lhs.shape[-1]} "
-            f"must equal rhs penultimate dimension (rows) {rhs.shape[-2]}")
 
         assert lhs_k_pack or lhs_format == "e2m1", "only mxfp4 inputs can be packed along a dimension different than K"
         assert rhs_k_pack or rhs_format == "e2m1", "only mxfp4 inputs can be packed along a dimension different than K"
@@ -1669,8 +1601,11 @@ class TritonSemantic(Generic[TensorTy]):
         assert PACKED_B_DIM == PACKED_A_DIM, f"Reduction dimension should pack the same number of elements; (lhs: {lhs.shape} vs rhs: {rhs.shape})"
         #assert K * PACKED_B >= 64, f"scaled_dot NYI for K < 64. Got {K=}"
         B = lhs.type.shape[0] if lhs_rank == 3 else None
+        K = K_LHS
         if not lhs_k_pack:
             M = M * PACKED_A
+        else:
+            K = K * PACKED_A
         if not rhs_k_pack:
             N = N * PACKED_B
         ret_ty = tl.block_type(out_dtype, [B, M, N] if B else [M, N])
@@ -1682,6 +1617,8 @@ class TritonSemantic(Generic[TensorTy]):
             assert acc.type.shape == ret_ty.shape and acc.type.element_ty == out_dtype
         rhs_scale_handle = None if rhs_scale_is_none else rhs_scale.handle
         lhs_scale_handle = None if lhs_scale_is_none else lhs_scale.handle
+        self.verify_scaled_shape(M, N, K, None if lhs_scale_is_none else lhs_scale,
+                                 None if rhs_scale_is_none else rhs_scale)
         return self.tensor(
             self.builder.create_dot_scaled(lhs.handle, lhs_scale_handle, lhs_format_enum, rhs.handle, rhs_scale_handle,
                                            rhs_format_enum, fast_math, lhs_k_pack, rhs_k_pack, acc_handle), ret_ty)
@@ -1791,7 +1728,7 @@ class TritonSemantic(Generic[TensorTy]):
         head, *tail = inputs
         for i in range(len(tail)):
             head, tail[i] = self.broadcast_impl_value(head, tail[i])
-        for i in range(len(tail)):
+        for i in range(len(tail) - 1):
             head, tail[i] = self.broadcast_impl_value(head, tail[i])
         return (head, *tail)
 
@@ -1807,7 +1744,7 @@ class TritonSemantic(Generic[TensorTy]):
             pack,
         )
         region_builder_fn(elementwise_op)
-        # assert elementwise_op.verify()
+        assert elementwise_op.verify()
 
         return tuple(self.tensor(elementwise_op.get_result(i), ty) for i, ty in enumerate(result_types))
 

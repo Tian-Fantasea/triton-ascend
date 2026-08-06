@@ -21,8 +21,8 @@
  */
 
 #include "ascend/include/DynamicCVPipeline/SeparateMemoryFromComputePass.h"
-#include "ascend/include/DynamicCVPipeline/SeparateMemoryFromCompute/AddMultiBufferToGMLoadPass.h"
-#include "ascend/include/DynamicCVPipeline/SeparateMemoryFromCompute/AsyncLoadHoistingPass.h"
+#include "ascend/include/DynamicCVPipeline/Common/Utils.h"
+#include "ascend/include/DynamicCVPipeline/SeparateMemoryFromCompute/MarkGMLoadPass.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/Support/Debug.h"
 
@@ -33,30 +33,24 @@ static constexpr const char *DEBUG_TYPE = "separate-memory-from-compute";
 using namespace mlir;
 using namespace triton;
 
-static constexpr int kDefaultBufferDepth = 2;
-
 void SeparateMemoryFromComputePass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  int depth = kDefaultBufferDepth;
-
-  if (depth <= 1) {
-    LDBG("Buffer depth <= 1, skip multi-buffer transformation");
+  if (CVPipeline::hasFallbackAttr(module)) {
     return;
   }
 
   OpPassManager pm(module.getOperationName());
   LDBG("Enter SeparateMemoryFromCompute pass");
 
-  // Step 1: Hoist memory operations out of compute blocks
-  pm.addPass(createAsyncLoadHoistingPass());
-
-  // Step 2: Apply multi-buffering to memory operations
-  pm.addPass(createAddMultiBufferToGMLoadPass());
+  pm.addPass(createMarkGMLoadPass());
 
   if (failed(runPipeline(pm, module))) {
     module->emitError() << "[" << DEBUG_TYPE << "] Pass failed!";
-    signalPassFailure();
+    if (!CVPipeline::hasFallbackAttr(module)) {
+      CVPipeline::setFallbackAttr(module, CVPipeline::ERRCODE_FAILED);
+    }
+    return;
   }
 
   LDBG("Process successfully");
@@ -67,6 +61,10 @@ namespace triton {
 
 std::unique_ptr<OperationPass<ModuleOp>> createSeparateMemoryFromComputePass() {
   return std::make_unique<SeparateMemoryFromComputePass>();
+}
+
+void registerSeparateMemoryFromComputePasses() {
+  registerPass(createMarkGMLoadPass);
 }
 
 } // namespace triton

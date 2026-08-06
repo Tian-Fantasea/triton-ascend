@@ -83,10 +83,12 @@ rm -rf ~/.triton/cache
 Disabling cache during debugging: You are advised to temporarily disable the cache to ensure that the compilation is performed each time when debugging compilation issues.
 
 ```bash
-export TRITON_DISABLE_CACHE=1
+export TRITON_ALWAYS_COMPILE=1
 ```
 
 Cache verification: If you suspect that the issue is caused by the cache, delete related cache files and perform the test again.
+
+<a id="debug-dump-files"></a>
 
 ### 3.2 Dump Files
 
@@ -110,7 +112,7 @@ Even if the cache is enabled, the system still generates dump files (overriding 
 ```bash
 # Set environment variables before running the Triton program.
 export TRITON_DEBUG=1
-export TRITON_DISABLE_CACHE=1
+export TRITON_ALWAYS_COMPILE=1
 
 # Run Triton kernel.
 python your_triton_program.py
@@ -141,13 +143,13 @@ You can enable the dump file output by setting **TRITON_DEBUG=1** to obtain **ke
 
 - Run the test case.
 
-```python
+```bash
 TRITON_DEBUG=1 python 01-vector-add.py
 ```
 
 After the test case is executed, the dump file path is displayed. The default path is **~/.triton/dump**. The following information is displayed:
 
-```python
+```text
 Dumping intermediate results to ~/.triton/dump/xxx
 # xxx is a unique hash identifier.
 ```
@@ -159,7 +161,7 @@ Go to the dump path and view **kernel.ttir.mlir** and **kernel.ttadapter.mlir**.
 - TTIR example
 The **kernel.ttir.mlir** file is as follows:
 
-```python
+```mlir
 module {
   tt.func public @add_kernel(%arg0: !tt.ptr<f32> {tt.divisibility = 16 : i32} , %arg1: !tt.ptr<f32> {tt.divisibility = 16 : i32} , %arg2: !tt.ptr<f32> {tt.divisibility = 16 : i32} , %arg3: i32 {tt.divisibility = 16 : i32} ) attributes {noinline = false} {
     %cst = arith.constant dense<0.000000e+00> : tensor<1024xf32> loc(#loc1)
@@ -201,7 +203,7 @@ The TTIR layer is still based on the native abstraction (such as `!tt.ptr<f32>`,
 - TTAdapter IR example
 The **kernel.ttadapter.mlir** file is as follows:
 
-```python
+```mlir
 module {
   func.func @add_kernel(%arg0: memref<?xi8>, %arg1: memref<?xi8>, %arg2: memref<?xf32> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg3: memref<?xf32> {tt.divisibility = 16 : i32, tt.tensor_kind = 0 : i32}, %arg4: memref<?xf32> {tt.divisibility = 16 : i32, tt.tensor_kind = 1 : i32}, %arg5: i32 {tt.divisibility = 16 : i32}, %arg6: i32, %arg7: i32, %arg8: i32, %arg9: i32, %arg10: i32, %arg11: i32) attributes {SyncBlockLockArgIdx = 0 : i64, WorkspaceArgIdx = 1 : i64, global_kernel = "local", mix_mode = "aiv", parallel_mode = "simd"} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -255,6 +257,8 @@ TTIR is converted to TTAdapter IR to adapt to the Ascend NPU architecture in the
 
 TTAdapter IR has been abstracted from Triton to adapt to the Ascend NPU format.
 
+<a id="debug-interpreter-mode"></a>
+
 ## 4 Interpreter Mode
 
 The core value of the interpreter is to **isolate hardware differences**. You can set the environment variable `TRITON_INTERPRET` to `1` to forcibly execute kernel computation on the CPU. The result of the kernel computation can be used as the benchmark for determining the NPU computation accuracy.
@@ -285,6 +289,8 @@ export TRITON_INTERPRET=0
 ```
 
 ## 5 Debugging Methods
+
+<a id="debug-printing"></a>
 
 ### 5.1 Debugging by Printing
 
@@ -405,6 +411,8 @@ Description of environment variables:
 
 **TRITON_DEBUG=1**: enables all debugging outputs (including compilation and runtime printing).
 
+<a id="debug-compilation-error"></a>
+
 ### 5.2 Compilation Error Debugging
 
 When the `ttir.mlir` → `ttadapter.mlir` conversion fails, the `ttadapter.mlir` cannot be generated and the `MLIRCompileError` error is reported.
@@ -486,9 +494,9 @@ Only for LLVM experts: For common Triton developers, this is considered "noise."
 
 **Suggestion:**
 Enable this function only when LLVM backend bugs are suspected (for example, invalid instructions are generated or performance exceptions occur).
-It can be used together with LLVM_DEBUG_ONLY to limit the output scope.
+It can be used together with TRITON_LLVM_DEBUG_ONLY to limit the output scope.
 
-When `TRITON_ENABLE_LLVM_DEBUG=1` is enabled, you can use the `LLVM_DEBUG_ONLY` environment variable to specify the module for which the logs will be output. The following is a brief description of the common `DEBUG_TYPE`:
+When `TRITON_ENABLE_LLVM_DEBUG=1` is enabled, you can use the `TRITON_LLVM_DEBUG_ONLY` environment variable to specify the module for which the logs will be output. The following is a brief description of the common `DEBUG_TYPE`:
 
 ```bash
 ## `isel` (Instruction Selection)
@@ -522,7 +530,7 @@ In the following example, it is specified that only `isel` is output.
 
 ```bash
 export TRITON_ENABLE_LLVM_DEBUG=1
-export LLVM_DEBUG_ONLY="isel"
+export TRITON_LLVM_DEBUG_ONLY="isel"
 python your_triton_script.py
 ```
 
@@ -530,7 +538,7 @@ python your_triton_script.py
 Enable `MLIR_ENABLE_DUMP=1` first.
 → Check whether the conversion at the MLIR layer is correct (for example, ReduceOp → scf.for).
 If the MLIR is normal but the result is incorrect:
-→ It is suspected that the LLVM is faulty. Enable `TRITON_ENABLE_LLVM_DEBUG=1 + LLVM_DEBUG_ONLY`.
+→ It is suspected that the LLVM is faulty. Enable `TRITON_ENABLE_LLVM_DEBUG=1 + TRITON_LLVM_DEBUG_ONLY`.
 Do not directly enable `TRITON_ENABLE_LLVM_DEBUG=1`.
 → Large log size may mask key information and severely affect the running speed.
 
@@ -539,7 +547,7 @@ Do not directly enable `TRITON_ENABLE_LLVM_DEBUG=1`.
 | Variable                     | Description                            |
 |--------------------------|----------------------------------|
 | `TRITON_DEBUG=1`         | Enables intermediate IR dump.                |
-| `TRITON_DISABLE_CACHE=1` | Disables compilation cache.                    |
+| `TRITON_ALWAYS_COMPILE=1` | Enable recompilation and disable cache reuse. |
 | `TRITON_INTERPRET=1`     | Uses the CPU interpreter to execute the kernel.      |
 | `TRITON_DEVICE_PRINT=1`  | Enables runtime print output and compilation print output.     |
 | `MLIR_ENABLE_DUMP=1`  | Enables automatic dump of the MLIR high-level IR. Outputs the IR of the current function in readable text before and after each MLIR pass is executed.|

@@ -34,13 +34,14 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <optional>
 
 namespace mlir {
 namespace triton {
 enum class VarUpdateType { INC, DEC };
 
 struct OutputGroupInfo {
-  SmallVector<Value> outputs;
+  SmallVector<Operation *> outputs;
   SmallVector<Value> inputVars;
 };
 
@@ -73,24 +74,25 @@ private:
   Value getVarValue(scf::ForOp forOp, int varIndex);
 
   void collectDependencyBuffers(
+      ModuleOp module, SmallVector<scf::ForOp> &mainLoopForOps,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &crossCoreBuffers,
+      DenseMap<scf::ForOp,
+               DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>>
+          &intraCoreBuffersMap);
+
+  int buildIdxToVarMap(
       scf::ForOp forOp,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &crossCoreBuffers,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &intraCoreBuffers);
-
-  DenseMap<int, DenseMap<Value, SmallVector<Value>>>
-  extendCrossCoreBuffersWithEquivalentValues(
-      ModuleOp module,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> crossCoreBuffers);
-
-  int buildIdxToVarMap(scf::ForOp forOp,
-                       const DenseMap<int, DenseMap<Value, SmallVector<Value>>>
-                           &intraCoreBuffers,
-                       DenseMap<int, Value> &idxToVar);
+      const DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &intraCoreBuffers,
+      DenseMap<int, Value> &idxToVar);
 
   int getInputOutputValues(
       scf::IfOp ifOp,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> crossCoreBuffers,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> intraCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          crossCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          intraCoreBuffers,
       SmallVector<int> &crossCoreInputValues,
       SmallVector<int> &crossCoreOutputValues,
       SmallVector<int> &intraCoreInputValues,
@@ -98,7 +100,8 @@ private:
 
   int buildOutputGroups(
       SmallVector<int> &intraCoreOutputValues,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &intraCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &intraCoreBuffers,
       DenseMap<int, Value> &idxToVar,
       SmallVector<OutputGroupInfo> &outputGroups);
 
@@ -110,8 +113,24 @@ private:
 
   int collectIntraCoreOutputConditions(
       OpBuilder &builder, Location loc,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &intraCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &intraCoreBuffers,
       SmallVector<int> &intraCoreOutputValues, DenseMap<int, Value> &idxToVar,
+      SmallVector<Value> &conditions, DenseSet<Value> &usedVarsSet,
+      DenseMap<Value, VarUpdateType> &varUpdateTypes);
+
+  // Build the ifOp variable mapping for the tensor iter_args
+  int buildTensorIterArgIfOpVarMap(scf::ForOp forOp);
+
+  // Collect the consumption conditions of the tensor iter_args consumer
+  void collectTensorIterArgInputConditions(
+      OpBuilder &builder, Location loc, scf::IfOp ifOp,
+      SmallVector<Value> &conditions, DenseSet<Value> &usedVarsSet,
+      DenseMap<Value, VarUpdateType> &varUpdateTypes);
+
+  // Collect tensor iter_args producer conditions
+  void collectTensorIterArgOutputConditions(
+      OpBuilder &builder, Location loc, scf::IfOp ifOp,
       SmallVector<Value> &conditions, DenseSet<Value> &usedVarsSet,
       DenseMap<Value, VarUpdateType> &varUpdateTypes);
 
@@ -138,7 +157,8 @@ private:
 
   int setIntraCoreCondition(
       ModuleOp module, scf::IfOp ifOp,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &intraCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &intraCoreBuffers,
       SmallVector<int> &intraCoreInputIndices,
       SmallVector<int> &intraCoreOutputIndices, DenseMap<int, Value> &idxToVar,
       DenseMap<Value, VarUpdateType> &varUpdateTypes, Value &intraCoreCond);
@@ -149,16 +169,24 @@ private:
   int updateForOpYield(scf::ForOp forOp);
 
   int combineConditions(ModuleOp module, Value crossCoreCond,
-                        Value intraCoreCond, scf::IfOp ifOp, scf::ForOp forOp,
-                        size_t &usedCounterNum,
+                        Value intraCoreCond, Value flowOptCond, scf::IfOp ifOp,
+                        scf::ForOp forOp, size_t &usedCounterNum,
                         DenseMap<Value, VarUpdateType> &varUpdateTypes);
 
   int setCrossCoreCondition(
       SmallVector<int> crossCoreInputValues,
       SmallVector<int> crossCoreOutputValues,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &crossCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &crossCoreBuffers,
       scf::IfOp ifOp, SmallVector<SmallVector<Value>> ssbufferPtrs,
       Value &crossCoreCond);
+
+  // Set the FlowOpt extra condition for the third if block in the DAG
+  int setFlowOptCondition(scf::IfOp currentIfOp, scf::ForOp forOp,
+                          Value &flowOptCond);
+
+  // Update DAG nodes after ifOp replacement
+  void updateDAGAfterIfOpReplacement(scf::IfOp oldIfOp, scf::IfOp newIfOp);
 
   // Helper function to get pointer based on core type
   Value getSSBufferPtr(bool isAIC, int groupIdx, int ptrSetIdx,
@@ -166,7 +194,7 @@ private:
                        SmallVector<SmallVector<Value>> ssbufferPtrs);
 
   // Compute pointers for VECTOR core SSBuffer
-  DenseMap<int, Value>
+  std::optional<DenseMap<int, Value>>
   computeVectorSSBufferPtrs(OpBuilder &builder, Location loc,
                             Operation *scopeOp,
                             SmallVector<int> crossCoreInputValues,
@@ -176,7 +204,8 @@ private:
   Value addCrossCoreConditions(
       OpBuilder &builder, Location loc, SmallVector<int> crossCoreInputValues,
       SmallVector<int> crossCoreOutputValues,
-      DenseMap<int, DenseMap<Value, SmallVector<Value>>> &crossCoreBuffers,
+      DenseMap<int, DenseMap<Operation *, SmallVector<Operation *>>>
+          &crossCoreBuffers,
       bool isAIC, Value zeroConst, DenseMap<int, Value> &precomputedPtrs,
       SmallVector<SmallVector<Value>> ssbufferPtrs);
 
@@ -192,6 +221,9 @@ private:
   DenseMap<Value, Value> controlVarToLatestValue;
   SmallVector<Value> currentUsedVars;
   ControlFlowConditionInfo *info = nullptr;
+  // Record each ifOp as the variables that need to be controlled when it acts
+  // as a consumer or a producer
+  llvm::DenseMap<scf::IfOp, TensorIterArgIfOpVars> tensorIterArgIfOpVars;
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createUpdateConditionInfoPass();

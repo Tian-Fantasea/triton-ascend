@@ -51,18 +51,21 @@ NPU and GPU compute units differ in supported data types and execution behavior.
 
 ```diff
 import torch
-+ import torch_npu  # [Added] Import Ascend NPUs' PyTorch adaptation library to support NPU devices.
+# [Added] Import Ascend NPUs' PyTorch adaptation library to support NPU devices.
+import torch_npu
 import triton
 import triton.language as tl
 
-- DEVICE = triton.runtime.driver.active.get_active_torch_device()  #  [Deleted] GPU devices are automatically obtained. NPUs do not need this logic.
+# [Deleted] GPU devices are automatically obtained. NPUs do not need this logic.
+# DEVICE = triton.runtime.driver.active.get_active_torch_device()
 
 @triton.jit
-def add_kernel(x_ptr, # Pointer to first input vector.
-y_ptr, # Pointer to second input vector.
-output_ptr, # Pointer to output vector.
-n_elements, # Size of the vector.
-BLOCK_SIZE: tl.constexpr, # Number of elements each program should process.
+def add_kernel(
+    x_ptr,  # Pointer to first input vector.
+    y_ptr,  # Pointer to second input vector.
+    output_ptr,  # Pointer to output vector.
+    n_elements,  # Size of the vector.
+    BLOCK_SIZE: tl.constexpr,  # Number of elements each program should process.
 ):
     pid = tl.program_id(axis=0) # We use a 1D launch grid so axis is 0.
     block_start = pid * BLOCK_SIZE
@@ -75,7 +78,8 @@ BLOCK_SIZE: tl.constexpr, # Number of elements each program should process.
 
 def add(x: torch.Tensor, y: torch.Tensor):
     output = torch.empty_like(x)
--   assert x.device == DEVICE and y.device == DEVICE and output.device == DEVICE  # [Deleted] GPU devices have consistency checks. NPUs do not need explicit assertion.
+    # [Deleted] GPU devices have consistency checks. NPUs do not need explicit assertion.
+    assert x.device == DEVICE and y.device == DEVICE and output.device == DEVICE
     n_elements = output.numel()
     grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']), )
     add_kernel[grid](x, y, output, n_elements, BLOCK_SIZE=1024)
@@ -83,16 +87,18 @@ def add(x: torch.Tensor, y: torch.Tensor):
 
 torch.manual_seed(0)
 size = 98432
-- x = torch.rand(size, device='cuda')  # [Deleted] Specify the GPU device.
-+ x = torch.rand(size, device='npu')  # [Modified] Specify the Ascend NPU device.
-- y = torch.rand(size, device='cuda')  # [Deleted] Specify the GPU device.
-+ y = torch.rand(size, device='npu')  # [Modified] Specify the Ascend NPU device.
+# x = torch.rand(size, device='cuda')  # [Deleted] Specify the GPU device.
+x = torch.rand(size, device='npu')  # [Modified] Specify the Ascend NPU device.
+# y = torch.rand(size, device='cuda')  # [Deleted] Specify the GPU device.
+y = torch.rand(size, device='npu')  # [Modified] Specify the Ascend NPU device.
 output_torch = x + y
 output_triton = add(x, y)
 print(output_torch)
 print(output_triton)
-print(f'The maximum difference between torch and triton is '
-f'{torch.max(torch.abs(output_torch - output_triton))}')
+print(
+    f'The maximum difference between torch and triton is '
+    f'{torch.max(torch.abs(output_torch - output_triton))}'
+)
 ```
 
 ### Example 2: Device Replacement and Single-Program Data Transfer
@@ -120,11 +126,11 @@ def test_npu_1d(shape, dtype):
     XS = shape[0]
     YS = 4
 
--    x = torch.randint(-1000, 1000, (XS,), dtype=dtype, device='cuda')
-+    x = torch.randint(-1000, 1000, (XS,), dtype=dtype, device='npu')
+#    x = torch.randint(-1000, 1000, (XS,), dtype=dtype, device='cuda')
+    x = torch.randint(-1000, 1000, (XS,), dtype=dtype, device='npu')
     std = torch.broadcast_to(x, (YS, XS))
--    output = torch.randint(-1000, 1000, (YS, XS), dtype=dtype, device='cuda')
-+    output = torch.randint(-1000, 1000, (YS, XS), dtype=dtype, device='npu')
+#    output = torch.randint(-1000, 1000, (YS, XS), dtype=dtype, device='cuda')
+    output = torch.randint(-1000, 1000, (YS, XS), dtype=dtype, device='npu')
     fn_broadcast_1d[(1,)](output, x, XS, YS)
     assert torch.allclose(std, output)
 ```
@@ -134,11 +140,14 @@ def test_npu_1d(shape, dtype):
 After completing the basic migration procedure, you may encounter the following two types of new issues:
 
 1. **coreDim** limit
-This issue is triggered when grid dimensions exceed the hardware limit of NPUs.
-Typical error message: `coreDim=xxxx can't be greater than UINT16_MAX`.
+
+   This issue is triggered when grid dimensions exceed the hardware limit of NPUs.
+   Typical error message: `coreDim=xxxx can't be greater than UINT16_MAX`.
+
 2. UB space overflow
-Memory usage exceeds the NPU cache capacity.
-Typical error message: `ub overflow, requires xxxx bits while 1572684 bits available!`.
+
+   Memory usage exceeds the NPU cache capacity.
+   Typical error message: `ub overflow, requires xxxx bits while 1572864 bits available!`.
 
 ### Solving the coreDim Limit Issue
 
