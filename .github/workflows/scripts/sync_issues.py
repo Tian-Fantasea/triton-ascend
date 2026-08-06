@@ -2,18 +2,19 @@
 """
 Sync triton-ascend open issues with the "Issue跟踪" sheet in Google Sheets.
 
-功能:
-  1. 从 GitHub 获取所有 open issue（含最后评论内容）
-  2. 将 issue 数据发送给 Apps Script，由 Apps Script 直接读取表格做增量更新:
-     - 已存在 → 更新该行 A-J 列（不动 K/L/M）
-     - 不存在 → 末尾追加新行
-  3. 第 2 行写入最新执行时间
-  4. 分批发送，每批 10 条，带重试
-  5. 时间统一使用北京时间 (UTC+8)
+Features:
+  1. Fetch all open issues from GitHub (including last comment content)
+  2. Send issue data to Apps Script for incremental update:
+     - Existing -> update columns A-J (leave K/L/M untouched)
+     - New -> append a new row
+  3. Write last execution time to row 2
+  4. Batch sending, 10 issues per batch, with retry
+  5. All timestamps use Beijing timezone (UTC+8)
 
-环境变量:
-  GITHUB_TOKEN     - GitHub token (Actions 自动注入 secrets.GITHUB_TOKEN)
-  SHEET_WEBAPP_URL - Apps Script Web App URL (需配置为仓库 Secret)
+Environment variables:
+  GITHUB_TOKEN     - GitHub token (auto-injected by Actions as secrets.GITHUB_TOKEN)
+  SHEET_ID         - Google Sheets spreadsheet ID (configure as repository secret)
+  SHEET_WEBAPP_URL - Apps Script Web App URL (configure as repository secret)
 """
 
 import os
@@ -22,15 +23,15 @@ import time
 import requests
 from datetime import datetime, timezone, timedelta
 
-# ===== 时区 =====
+# ===== Timezone =====
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-# ===== GitHub 配置 =====
+# ===== GitHub Config =====
 REPO_OWNER = "triton-lang"
 REPO_NAME = "triton-ascend"
 API_BASE = "https://api.github.com"
 
-# ===== Google Sheets 配置 =====
+# ===== Google Sheets Config =====
 SHEET_ID = os.environ.get("SHEET_ID", "")
 SHEET_NAME = "Issue跟踪"
 SHEET_WEBAPP_URL = os.environ.get("SHEET_WEBAPP_URL", "")
@@ -56,7 +57,7 @@ TYPE_LABELS = {
     "ssbuffer",
 }
 
-# ===== GitHub API 函数 =====
+# ===== GitHub API Functions =====
 
 
 def make_headers(token=None):
@@ -70,7 +71,7 @@ def make_headers(token=None):
 
 
 def requests_get(url, headers=None, params=None, max_retries=3, timeout=60):
-    """带重试的 GET 请求，应对网络超时"""
+    """GET request with retry on network timeout."""
     for attempt in range(max_retries):
         try:
             return requests.get(url, headers=headers, params=params, timeout=timeout)
@@ -84,7 +85,7 @@ def requests_get(url, headers=None, params=None, max_retries=3, timeout=60):
 
 
 def get_remaining_from_response(resp):
-    """从响应头中提取剩余 API 调用次数"""
+    """Extract remaining API call count from response headers."""
     remaining = resp.headers.get("X-RateLimit-Remaining")
     if remaining is not None:
         return int(remaining)
@@ -92,7 +93,7 @@ def get_remaining_from_response(resp):
 
 
 def fetch_all_open_issues(token=None):
-    """获取仓库所有 open issue（排除 PR）"""
+    """Fetch all open issues from the repo (excluding PRs)."""
     headers = make_headers(token)
     issues = []
     page = 1
@@ -135,7 +136,7 @@ def fetch_all_open_issues(token=None):
 
 
 def fetch_last_comment(issue_number, token=None):
-    """获取 issue 的最后一条评论，返回 dict 或 None"""
+    """Fetch the last comment of an issue, return dict or None."""
     headers = make_headers(token)
     url = f"{API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/issues/{issue_number}/comments"
     params = {"per_page": 1, "sort": "created", "direction": "desc"}
@@ -155,15 +156,15 @@ def fetch_last_comment(issue_number, token=None):
 
 
 def parse_dt(dt_str):
-    """解析 GitHub API 时间字符串"""
+    """Parse GitHub API datetime string."""
     return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
 
 
-# ===== 数据处理函数 =====
+# ===== Data Processing Functions =====
 
 
 def categorize_labels(label_names):
-    """将 GitHub labels 分为状态标签和类型标签（各取第一个匹配的）"""
+    """Split GitHub labels into status label and type label (first match each)."""
     status = ""
     type_label = ""
     for name in label_names:
@@ -191,7 +192,7 @@ def fmt_dt(dt):
 
 
 def build_issue_data(issue, last_comment):
-    """构建单条 issue 的数据 (issue编号 + 10列值 A-J)"""
+    """Build issue data (issue number + 10 column values A-J)."""
     created_at = parse_dt(issue["created_at"])
     label_names = [l["name"] for l in issue["labels"]]
     status_labels, type_labels = categorize_labels(label_names)
@@ -208,23 +209,23 @@ def build_issue_data(issue, last_comment):
         "values": [
             issue["title"],  # A: Issue Title
             issue["html_url"],  # B: Issue Link
-            "否",  # C: 是否关闭
-            (issue.get("user") or {}).get("login", "unknown"),  # D: 创建者
-            fmt_dt(created_at),  # E: 创建时间
-            "",  # F: 关闭时间
-            last_comment_body,  # G: 最后评论内容
-            last_comment_time,  # H: 最后评论时间
-            status_labels,  # I: 状态标签
-            type_labels,  # J: 类型标签
+            "否",  # C: Is Closed
+            (issue.get("user") or {}).get("login", "unknown"),  # D: Author
+            fmt_dt(created_at),  # E: Created Time
+            "",  # F: Closed Time
+            last_comment_body,  # G: Last Comment
+            last_comment_time,  # H: Last Comment Time
+            status_labels,  # I: Status Label
+            type_labels,  # J: Type Label
         ],
     }
 
 
-# ===== Google Sheets 同步 =====
+# ===== Google Sheets Sync =====
 
 
 def sync_to_sheet(issues_data):
-    """分批发送 issue 数据到 Apps Script（每批 10 条）"""
+    """Send issue data to Apps Script in batches (10 per batch)."""
     if not SHEET_ID:
         print("ERROR: SHEET_ID not set. Configure it as a repository secret.")
         return False
@@ -298,7 +299,7 @@ def sync_to_sheet(issues_data):
     return True
 
 
-# ===== 主流程 =====
+# ===== Main =====
 
 
 def main():
