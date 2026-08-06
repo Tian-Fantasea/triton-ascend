@@ -60,7 +60,10 @@ TYPE_LABELS = {
 
 
 def make_headers(token=None):
-    headers = {"Accept": "application/vnd.github+json"}
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "triton-ascend-sync-issues/1.0",
+    }
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
@@ -148,7 +151,7 @@ def fetch_last_comment(issue_number, token=None):
             return data[0], remaining
     except requests.exceptions.RequestException as e:
         print(f"    Warning: failed to fetch comments for issue #{issue_number}: {e}")
-    return None, remaining
+    return None, 0
 
 
 def parse_dt(dt_str):
@@ -267,7 +270,8 @@ def sync_to_sheet(issues_data):
                         success = True
                         break
                     else:
-                        print(f"  Batch {batch_idx+1}: unexpected response: {resp.text[:200]}")
+                        print(f"  Batch {batch_idx+1}: unexpected response (non-retryable): {resp.text[:200]}")
+                        break
                 elif resp.status_code >= 500:
                     print(f"  Batch {batch_idx+1}: HTTP {resp.status_code} (retryable): {resp.text[:200]}")
                 else:
@@ -328,10 +332,11 @@ def main():
         comment_count = issue.get("comments", 0)
 
         last_comment = None
-        if comment_count > 0 and remaining is not None and remaining >= 1:
+        if comment_count > 0 and (remaining is None or remaining >= 1):
             last_comment, new_remaining = fetch_last_comment(number, token)
             if new_remaining is not None:
                 remaining = new_remaining
+            time.sleep(0.5)
         elif comment_count > 0:
             print(f"  Warning: skipping comment fetch for issue #{number} (rate limit remaining: {remaining})")
 
