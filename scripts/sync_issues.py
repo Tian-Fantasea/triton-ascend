@@ -34,7 +34,6 @@ API_BASE = "https://api.github.com"
 SHEET_ID = os.environ.get("SHEET_ID", "")
 SHEET_NAME = "Issue跟踪"
 SHEET_WEBAPP_URL = os.environ.get("SHEET_WEBAPP_URL", "")
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit" if SHEET_ID else ""
 
 STATUS_LABELS = {
     "triage review",
@@ -147,7 +146,7 @@ def fetch_last_comment(issue_number, token=None):
         data = resp.json()
         if data:
             return data[0], remaining
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.RequestException as e:
         print(f"    Warning: failed to fetch comments for issue #{issue_number}: {e}")
     return None, remaining
 
