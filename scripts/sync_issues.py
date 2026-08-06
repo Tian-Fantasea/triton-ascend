@@ -37,16 +37,28 @@ SHEET_WEBAPP_URL = os.environ.get("SHEET_WEBAPP_URL", "")
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit" if SHEET_ID else ""
 
 STATUS_LABELS = {
-    "triage review", "triaged", "wait feedback", "resolved",
-    "stale", "duplicated", "invalid", "wontfix",
+    "triage review",
+    "triaged",
+    "wait feedback",
+    "resolved",
+    "stale",
+    "duplicated",
+    "invalid",
+    "wontfix",
 }
 TYPE_LABELS = {
-    "feature request", "rfc", "question", "documentation",
-    "installation", "performance", "bug", "ssbuffer",
+    "feature request",
+    "rfc",
+    "question",
+    "documentation",
+    "installation",
+    "performance",
+    "bug",
+    "ssbuffer",
 }
 
-
 # ===== GitHub API 函数 =====
+
 
 def make_headers(token=None):
     headers = {"Accept": "application/vnd.github+json"}
@@ -59,11 +71,17 @@ def requests_get(url, headers=None, params=None, max_retries=3, timeout=60):
     """带重试的 GET 请求，应对网络超时"""
     for attempt in range(max_retries):
         try:
-            return requests.get(url, headers=headers, params=params, timeout=timeout)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            return requests.get(url,
+                                headers=headers,
+                                params=params,
+                                timeout=timeout)
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout):
             if attempt < max_retries - 1:
                 wait = 5 * (attempt + 1)
-                print(f"    Network timeout, retry in {wait}s ({attempt+1}/{max_retries})...")
+                print(
+                    f"    Network timeout, retry in {wait}s ({attempt+1}/{max_retries})..."
+                )
                 time.sleep(wait)
             else:
                 raise
@@ -96,12 +114,14 @@ def fetch_all_open_issues(token=None):
         if resp.status_code == 403:
             reset_ts = int(resp.headers.get("X-RateLimit-Reset", 0))
             reset_dt = datetime.fromtimestamp(reset_ts, tz=timezone.utc)
-            wait_sec = max(0, (reset_dt - datetime.now(timezone.utc)).total_seconds())
+            wait_sec = max(0, (reset_dt -
+                               datetime.now(timezone.utc)).total_seconds())
             print(f"\nAPI rate limit! Resets in {wait_sec/60:.1f} min.")
             if not token:
                 print("Set GITHUB_TOKEN env var for higher limits (5000/hr).")
             if issues:
-                print(f"Got {len(issues)} issues, continuing with partial data.")
+                print(
+                    f"Got {len(issues)} issues, continuing with partial data.")
                 break
             sys.exit(1)
         resp.raise_for_status()
@@ -113,7 +133,9 @@ def fetch_all_open_issues(token=None):
         for item in data:
             if "pull_request" not in item:
                 issues.append(item)
-        print(f"  Page {page}, total {len(issues)} issues ({len(issues)-count_before} new)")
+        print(
+            f"  Page {page}, total {len(issues)} issues ({len(issues)-count_before} new)"
+        )
         if remaining is not None:
             print(f"  API remaining: {remaining}")
         page += 1
@@ -143,6 +165,7 @@ def parse_dt(dt_str):
 
 # ===== 数据处理函数 =====
 
+
 def categorize_labels(label_names):
     """将 GitHub labels 分为状态标签和类型标签（各取第一个匹配的）"""
     status = ""
@@ -159,7 +182,8 @@ def categorize_labels(label_names):
 def truncate(text, max_len=200):
     if not text:
         return ""
-    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r",
+                                                                " ").strip()
     if len(text) > max_len:
         return text[:max_len] + "..."
     return text
@@ -184,28 +208,32 @@ def build_issue_data(issue, last_comment):
         last_comment_time = fmt_dt(parse_dt(last_comment["created_at"]))
 
     return {
-        "number": issue["number"],
+        "number":
+        issue["number"],
         "values": [
-            issue["title"],                    # A: Issue Title
-            issue["html_url"],                 # B: Issue Link
-            "否",                               # C: 是否关闭
-            issue["user"]["login"],            # D: 创建者
-            fmt_dt(created_at),                # E: 创建时间
-            "",                                 # F: 关闭时间
-            last_comment_body,                 # G: 最后评论内容
-            last_comment_time,                 # H: 最后评论时间
-            status_labels,                     # I: 状态标签
-            type_labels,                       # J: 类型标签
+            issue["title"],  # A: Issue Title
+            issue["html_url"],  # B: Issue Link
+            "否",  # C: 是否关闭
+            issue["user"]["login"],  # D: 创建者
+            fmt_dt(created_at),  # E: 创建时间
+            "",  # F: 关闭时间
+            last_comment_body,  # G: 最后评论内容
+            last_comment_time,  # H: 最后评论时间
+            status_labels,  # I: 状态标签
+            type_labels,  # J: 类型标签
         ],
     }
 
 
 # ===== Google Sheets 同步 =====
 
+
 def sync_to_sheet(issues_data):
     """分批发送 issue 数据到 Apps Script（每批 10 条）"""
     if not SHEET_WEBAPP_URL:
-        print("ERROR: SHEET_WEBAPP_URL not set. Configure it as a repository secret.")
+        print(
+            "ERROR: SHEET_WEBAPP_URL not set. Configure it as a repository secret."
+        )
         return False
 
     batch_size = 10
@@ -213,7 +241,8 @@ def sync_to_sheet(issues_data):
     total_inserted = 0
     num_batches = (len(issues_data) + batch_size - 1) // batch_size
 
-    exec_time = datetime.now(BEIJING_TZ).strftime("Last execution time: %Y-%m-%d %H:%M:%S")
+    exec_time = datetime.now(BEIJING_TZ).strftime(
+        "Last execution time: %Y-%m-%d %H:%M:%S")
 
     for batch_idx in range(num_batches):
         start = batch_idx * batch_size
@@ -240,7 +269,9 @@ def sync_to_sheet(issues_data):
                         ins = result.get("inserts", 0)
                         total_updated += u
                         total_inserted += ins
-                        print(f"  Batch {batch_idx+1}/{num_batches}: {u} updates, {ins} inserts")
+                        print(
+                            f"  Batch {batch_idx+1}/{num_batches}: {u} updates, {ins} inserts"
+                        )
                         success = True
                         break
             except Exception as e:
@@ -260,6 +291,7 @@ def sync_to_sheet(issues_data):
 
 # ===== 主流程 =====
 
+
 def main():
     token = os.environ.get("GITHUB_TOKEN")
     if token:
@@ -274,7 +306,8 @@ def main():
             break
         except Exception as e:
             if attempt < 4:
-                print(f"\nFetch failed: {e}. Retrying in 10s ({attempt+2}/5)...")
+                print(
+                    f"\nFetch failed: {e}. Retrying in 10s ({attempt+2}/5)...")
                 time.sleep(10)
             else:
                 print(f"\nFetch failed after 5 attempts: {e}")
