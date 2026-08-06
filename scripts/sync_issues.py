@@ -137,14 +137,18 @@ def fetch_last_comment(issue_number, token=None):
     headers = make_headers(token)
     url = f"{API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/issues/{issue_number}/comments"
     params = {"per_page": 1, "sort": "created", "direction": "desc"}
-    resp = requests_get(url, headers=headers, params=params)
-    if resp.status_code == 403:
-        return None, 0
-    resp.raise_for_status()
-    remaining = get_remaining_from_response(resp)
-    data = resp.json()
-    if data:
-        return data[0], remaining
+    remaining = None
+    try:
+        resp = requests_get(url, headers=headers, params=params)
+        if resp.status_code == 403:
+            return None, 0
+        resp.raise_for_status()
+        remaining = get_remaining_from_response(resp)
+        data = resp.json()
+        if data:
+            return data[0], remaining
+    except requests.exceptions.HTTPError as e:
+        print(f"    Warning: failed to fetch comments for issue #{issue_number}: {e}")
     return None, remaining
 
 
@@ -230,6 +234,7 @@ def sync_to_sheet(issues_data):
     batch_size = 10
     total_updated = 0
     total_inserted = 0
+    total_failed = 0
     num_batches = (len(issues_data) + batch_size - 1) // batch_size
 
     exec_time = datetime.now(BEIJING_TZ).strftime("Last execution time: %Y-%m-%d %H:%M:%S")
@@ -249,9 +254,9 @@ def sync_to_sheet(issues_data):
 
         success = False
         for attempt in range(5):
-            cache_bust_url = f"{SHEET_WEBAPP_URL}?v={int(time.time() * 1000)}"
+            cache_bust_params = {"v": int(time.time() * 1000)}
             try:
-                resp = requests.post(cache_bust_url, json=payload, timeout=120)
+                resp = requests.post(SHEET_WEBAPP_URL, json=payload, params=cache_bust_params, timeout=120)
                 if resp.status_code == 200:
                     result = resp.json()
                     if result.get("status") == "ok":
@@ -262,13 +267,24 @@ def sync_to_sheet(issues_data):
                         print(f"  Batch {batch_idx+1}/{num_batches}: {u} updates, {ins} inserts")
                         success = True
                         break
+                    else:
+                        print(f"  Batch {batch_idx+1}: unexpected response: {resp.text[:200]}")
+                else:
+                    print(f"  Batch {batch_idx+1}: HTTP {resp.status_code}: {resp.text[:200]}")
             except Exception as e:
                 print(f"  Error: {e}")
             print(f"  Batch {batch_idx+1} retry ({attempt+1}/5)...")
             time.sleep(3)
 
         if not success:
+            total_failed += 1
             print(f"  Batch {batch_idx+1} failed, skipping")
+
+    if total_failed > 0:
+        print(f"\nSync completed with {total_failed} batch(es) failed!")
+        print(f"  Total rows updated: {total_updated}")
+        print(f"  Total rows inserted: {total_inserted}")
+        return False
 
     print(f"\nSync complete!")
     print(f"  Total rows updated: {total_updated}")
