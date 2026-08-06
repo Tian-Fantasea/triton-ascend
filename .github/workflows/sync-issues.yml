@@ -19,7 +19,8 @@ jobs:
 
       - run: pip install requests
 
-      - run: python sync_issues.py
+      - run: python scripts/sync_issues.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
           SHEET_WEBAPP_URL: ${{ secrets.SHEET_WEBAPP_URL }}
