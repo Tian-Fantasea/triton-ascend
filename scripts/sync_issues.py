@@ -203,7 +203,7 @@ def build_issue_data(issue, last_comment):
             issue["title"],  # A: Issue Title
             issue["html_url"],  # B: Issue Link
             "否",  # C: 是否关闭
-            issue["user"]["login"],  # D: 创建者
+            (issue.get("user") or {}).get("login", "unknown"),  # D: 创建者
             fmt_dt(created_at),  # E: 创建时间
             "",  # F: 关闭时间
             last_comment_body,  # G: 最后评论内容
@@ -219,6 +219,10 @@ def build_issue_data(issue, last_comment):
 
 def sync_to_sheet(issues_data):
     """分批发送 issue 数据到 Apps Script（每批 10 条）"""
+    if not SHEET_ID:
+        print("ERROR: SHEET_ID not set. Configure it as a repository secret.")
+        return False
+
     if not SHEET_WEBAPP_URL:
         print("ERROR: SHEET_WEBAPP_URL not set. Configure it as a repository secret.")
         return False
@@ -269,7 +273,6 @@ def sync_to_sheet(issues_data):
     print(f"\nSync complete!")
     print(f"  Total rows updated: {total_updated}")
     print(f"  Total rows inserted: {total_inserted}")
-    print(f"  Sheet: {SHEET_URL}")
     return True
 
 
@@ -294,7 +297,7 @@ def main():
                 time.sleep(10)
             else:
                 print(f"\nFetch failed after 5 attempts: {e}")
-                return
+                sys.exit(1)
     print(f"\nFound {len(issues)} open issues on GitHub")
 
     if not issues:
@@ -321,7 +324,8 @@ def main():
     print(f"  Issues to sync: {len(issues_data)}")
     print(f"{'='*50}")
 
-    sync_to_sheet(issues_data)
+    if not sync_to_sheet(issues_data):
+        sys.exit(1)
 
 
 if __name__ == "__main__":
