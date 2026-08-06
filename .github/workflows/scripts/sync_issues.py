@@ -117,6 +117,7 @@ def fetch_all_open_issues(token=None):
                 print("Set GITHUB_TOKEN env var for higher limits (5000/hr).")
             if issues:
                 print(f"Got {len(issues)} issues, continuing with partial data.")
+                remaining = 0
                 break
             sys.exit(1)
         resp.raise_for_status()
@@ -157,6 +158,8 @@ def fetch_last_comment(issue_number, token=None):
 
 def parse_dt(dt_str):
     """Parse GitHub API datetime string."""
+    if dt_str is None:
+        return None
     return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
 
 
@@ -273,7 +276,7 @@ def sync_to_sheet(issues_data):
                     else:
                         print(f"  Batch {batch_idx+1}: unexpected response (non-retryable): {resp.text[:200]}")
                         break
-                elif resp.status_code >= 500:
+                elif resp.status_code >= 500 or resp.status_code == 429:
                     print(f"  Batch {batch_idx+1}: HTTP {resp.status_code} (retryable): {resp.text[:200]}")
                 else:
                     print(f"  Batch {batch_idx+1}: HTTP {resp.status_code} (non-retryable): {resp.text[:200]}")
