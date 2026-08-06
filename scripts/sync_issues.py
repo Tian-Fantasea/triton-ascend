@@ -268,9 +268,12 @@ def sync_to_sheet(issues_data):
                         break
                     else:
                         print(f"  Batch {batch_idx+1}: unexpected response: {resp.text[:200]}")
+                elif resp.status_code >= 500:
+                    print(f"  Batch {batch_idx+1}: HTTP {resp.status_code} (retryable): {resp.text[:200]}")
                 else:
-                    print(f"  Batch {batch_idx+1}: HTTP {resp.status_code}: {resp.text[:200]}")
-            except Exception as e:
+                    print(f"  Batch {batch_idx+1}: HTTP {resp.status_code} (non-retryable): {resp.text[:200]}")
+                    break
+            except (requests.exceptions.RequestException, ValueError) as e:
                 print(f"  Error: {e}")
             print(f"  Batch {batch_idx+1} retry ({attempt+1}/5)...")
             time.sleep(3)
@@ -325,10 +328,12 @@ def main():
         comment_count = issue.get("comments", 0)
 
         last_comment = None
-        if comment_count > 0 and remaining is not None and remaining > 2:
+        if comment_count > 0 and remaining is not None and remaining >= 1:
             last_comment, new_remaining = fetch_last_comment(number, token)
             if new_remaining is not None:
                 remaining = new_remaining
+        elif comment_count > 0:
+            print(f"  Warning: skipping comment fetch for issue #{number} (rate limit remaining: {remaining})")
 
         issues_data.append(build_issue_data(issue, last_comment))
 
