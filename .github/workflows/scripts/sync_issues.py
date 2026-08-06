@@ -150,9 +150,9 @@ def fetch_last_comment(issue_number, token=None):
         data = resp.json()
         if data:
             return data[0], remaining
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ValueError) as e:
         print(f"    Warning: failed to fetch comments for issue #{issue_number}: {e}")
-    return None, 0
+    return None, remaining
 
 
 def parse_dt(dt_str):
